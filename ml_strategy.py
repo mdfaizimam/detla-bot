@@ -318,7 +318,8 @@ class MLForecastingStrategy:
                 if MAX_CONCURRENT_TRADES > 0:
                     active_position = await self._redis.get("active_position")
                     if active_position:
-                        log.debug(f"Decision loop paused: Active position '{active_position.decode()}' detected.")
+                        # --- FIX: Removed .decode() ---
+                        log.debug(f"Decision loop paused: Active position '{active_position}' detected.")
                         await asyncio.sleep(1) 
                         continue
                 

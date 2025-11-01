@@ -214,7 +214,8 @@ class PositionMonitor:
                 if msg.get("type") != "message":
                     continue
                 
-                channel = msg['channel'].decode('utf-8') # Decode channel name
+                # --- FIX: Removed .decode('utf-8') ---
+                channel = msg['channel'] 
                 
                 if channel != MONITORING_CHANNEL:
                     continue
