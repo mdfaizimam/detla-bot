@@ -1,5 +1,5 @@
 # --- feature_engine.py ---
-# Complete Updated File
+# Complete Updated File (Fixed Sequence Logic & Resubscribe Trigger)
 
 import asyncio
 import json
@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import time
 import re 
+import zlib 
 from collections import deque 
 import pandas as pd 
 import pandas_ta_classic as ta
@@ -21,7 +22,9 @@ from config import (
     USER_AGENT,
     VOLUME_TIMEFRAME,
     VOLUME_SMA_PERIOD,
-    ATR_TIMEFRAME # ✅ NEW
+    ATR_TIMEFRAME,
+    SPOT_INDEX_SYMBOLS,
+    CONTROL_CHANNEL 
 ) 
 
 log = logging.getLogger("feature_engine")
@@ -47,14 +50,7 @@ RESOLUTION_SECONDS = {
 class FeatureEngine:
     """
     Subscribes to raw WS feed (delta:raw:ws) and emits an enriched stream (delta:enriched).
-    - Primes candle history via REST API on startup.
-    - Maintains a local orderbook via 'l2_updates'.
-    - Maintains a local trade log via 'all_trades'.
-    - Maintains a cache of the latest candles, mark price, and funding rate.
-    - Calculates OBI, Mid-Price, TFI.
-    - Calculates Technical Indicators (EMAs, Pivots, Volume SMA, ATR).
-    - Calculates S/R levels (PWH/L, PMH/L).
-    - Enforces a "readiness" check before publishing.
+    - Includes L2 Checksum and Sequence validation.
     """
 
     def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, top_n=5):
@@ -66,6 +62,7 @@ class FeatureEngine:
         self.trade_logs = {}  
         self.features = {} 
         self.candle_history = {} 
+        self.sequence_numbers = {} # Track sequence numbers for L2 updates
         
         self.symbol_ready_state = {}
         
@@ -102,6 +99,7 @@ class FeatureEngine:
                 "last_trade_price": None,
                 "mark_price": None,
                 "funding_rate": None,
+                "spot_price": None, 
                 "tas": {}, 
                 "timestamp": 0,
                 "PWH": None, "PWL": None,
@@ -122,6 +120,9 @@ class FeatureEngine:
                 "funding": False
             }
             log.info(f"Initialized readiness state for {symbol}")
+            
+        if symbol not in self.sequence_numbers:
+            self.sequence_numbers[symbol] = -1 # Initialize sequence number
 
     def _is_symbol_ready(self, symbol: str) -> bool:
         """Checks if all required data has been received for a symbol."""
@@ -133,12 +134,27 @@ class FeatureEngine:
         if state.get("full", False):
             return True
             
+        # We need the core market data to be ready
         if state["book"] and state["mark"] and state["funding"]:
             log.info(f"✅ {symbol} is now data-ready. Publishing enriched feed.")
             state["full"] = True 
             return True
             
         return False
+        
+    async def _publish_resubscribe_request(self, symbol: str):
+        """Publishes a message to the control channel to ask WSManager to resubscribe."""
+        payload = {
+            "command": "RESUBSCRIBE_L2",
+            "symbol": symbol
+        }
+        await self.redis.publish(CONTROL_CHANNEL, json.dumps(payload))
+        
+        # Reset book state to wait for the new snapshot
+        self.symbol_ready_state[symbol]["book"] = False
+        self.sequence_numbers[symbol] = -1
+        log.warning(f"⚠️ Published RESUBSCRIBE_L2 request for {symbol}. Invalidating book state.")
+
 
     async def _prime_candle_history(self):
         """
@@ -153,7 +169,8 @@ class FeatureEngine:
                 try:
                     duration = RESOLUTION_SECONDS[res]
                     limit = CANDLE_HISTORY_SIZE + 50 
-                    start_time = end_time - (limit * duration) 
+                    # Request slightly more time to account for market closure/gaps
+                    start_time = end_time - (limit * duration * 1.5) 
                     
                     path = "/v2/history/candles" 
                     params = {
@@ -161,7 +178,8 @@ class FeatureEngine:
                         "resolution": res,
                         "start": str(start_time), 
                         "end": str(end_time),
-                        "limit": str(limit)
+                        # Max API limit is 2000, but we request up to the limit 
+                        "limit": str(min(2000, limit)) 
                     }
                     url = f"{DELTA_BASE_URL}{path}"
                     
@@ -200,27 +218,94 @@ class FeatureEngine:
         log.info("✅ Candle history priming and initial TA calculation complete.")
 
     # ----------------------------------------------------------------------
-    # WebSocket Message Handlers
+    # WebSocket Message Handlers with Checksum/Sequence Validation
     # ----------------------------------------------------------------------
+    
+    def _validate_checksum(self, symbol: str, received_cs: int) -> bool:
+        """
+        Validates the order book checksum based on top 10 price levels (per Delta API docs).
+        """
+        book = self.order_books.get(symbol)
+        if not book: return False
+
+        def build_string(side_data, key_source, ascending):
+            prices = sorted(key_source, key=float, reverse=not ascending)
+            parts = []
+            for price in prices[:10]:
+                size = book[side_data][price]
+                size_str = str(int(size)) if float(size).is_integer() else str(size)
+                parts.append(f"{price}:{size_str}")
+            return ",".join(parts)
+        
+        asks_keys = book["asks"].keys()
+        bids_keys = book["bids"].keys()
+
+        asks_str = build_string("asks", asks_keys, ascending=True)
+        bids_str = build_string("bids", bids_keys, ascending=False)
+        checksum_string = f"{asks_str}|{bids_str}"
+
+        try:
+            calculated_cs = zlib.crc32(checksum_string.encode('utf-8')) & 0xFFFFFFFF
+            received_cs_unsigned = received_cs & 0xFFFFFFFF
+        except AttributeError:
+             log.warning("zlib is required for CRC32 checksum, skipping validation.")
+             return True 
+
+        if calculated_cs != received_cs_unsigned:
+            log.error(f"❌ CHECKSUM MISMATCH for {symbol}! Recv: {received_cs}, Calc: {calculated_cs}. Resubscribe needed.")
+            return False
+        
+        return True
+
 
     def _handle_l2_snapshot(self, data: dict):
         symbol = data.get("symbol")
         if not symbol: return
         self._initialize_state(symbol)
+        
+        # 1. Store initial sequence number
+        self.sequence_numbers[symbol] = data.get("sequence_no", -1)
+        
+        # 2. Rebuild the book
         self.order_books[symbol]["bids"].clear()
         self.order_books[symbol]["asks"].clear()
         for price_str, size_str in data.get("bids", []):
             self.order_books[symbol]["bids"][price_str] = float(size_str)
         for price_str, size_str in data.get("asks", []):
             self.order_books[symbol]["asks"][price_str] = float(size_str)
-        
+
         if symbol in self.symbol_ready_state:
             self.symbol_ready_state[symbol]["book"] = True
-        log.info(f"✅ Order book snapshot received and built for {symbol}")
+        log.info(f"✅ Order book snapshot received and built for {symbol} (Seq: {self.sequence_numbers[symbol]})")
 
+    
     def _handle_l2_update(self, data: dict):
         symbol = data.get("symbol")
-        if symbol not in self.order_books: return
+        if symbol not in self.order_books or symbol not in self.sequence_numbers: return
+        
+        new_seq_no = data.get("sequence_no", -1)
+        received_cs = data.get("cs", -1)
+        
+        # --- FIX #1: Handle pre-snapshot updates by immediately triggering a resubscribe ---
+        if self.sequence_numbers[symbol] == -1:
+            log.warning(f"⚠️ Skipping L2 update (Seq {new_seq_no}) for {symbol}. Waiting for snapshot to establish sequence.")
+            
+            # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
+            asyncio.create_task(self._publish_resubscribe_request(symbol))
+            return
+        # ---------------------------------------------------------------------------------
+
+        # 1. Check sequence number continuity
+        expected_seq_no = self.sequence_numbers[symbol] + 1
+        if new_seq_no != expected_seq_no:
+            log.error(f"❌ SEQUENCE MISMATCH for {symbol}! Expected {expected_seq_no}, Got {new_seq_no}. Requires resubscribe.")
+            # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
+            asyncio.create_task(self._publish_resubscribe_request(symbol)) 
+            return 
+            
+        self.sequence_numbers[symbol] = new_seq_no
+
+        # 2. Apply updates
         for price_str, size_str in data.get("bids", []):
             size = float(size_str)
             if size == 0: self.order_books[symbol]["bids"].pop(price_str, None)
@@ -229,9 +314,17 @@ class FeatureEngine:
             size = float(size_str)
             if size == 0: self.order_books[symbol]["asks"].pop(price_str, None)
             else: self.order_books[symbol]["asks"][price_str] = size
-        
+
+        # 3. Validate Checksum (must be done AFTER applying the update)
+        if received_cs != -1:
+            if not self._validate_checksum(symbol, received_cs):
+                 # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
+                 asyncio.create_task(self._publish_resubscribe_request(symbol))
+                 return
+
         if symbol in self.symbol_ready_state and not self.symbol_ready_state[symbol]["book"]:
             self.symbol_ready_state[symbol]["book"] = True
+
 
     def _handle_all_trades_snapshot(self, data: dict):
         symbol = data.get("symbol")
@@ -327,6 +420,23 @@ class FeatureEngine:
         if symbol in self.symbol_ready_state:
             self.symbol_ready_state[symbol]["mark"] = True
 
+    
+    def _handle_spot_price(self, data: dict):
+        """Handle v2/spot_price message and store the price."""
+        full_symbol = data.get("s")
+        price = data.get("p")
+        if not full_symbol or price is None: return
+
+        # Map index symbol back to trading symbol (e.g., .DEXBTUSD -> BTCUSD)
+        trading_symbol = next((k for k, v in SPOT_INDEX_SYMBOLS.items() if v == full_symbol), None)
+        
+        if not trading_symbol: return
+
+        if trading_symbol not in self.features: self._initialize_state(trading_symbol)
+        
+        self.features[trading_symbol]["spot_price"] = float(price)
+
+
     # ----------------------------------------------------------------------
     # FEATURE CALCULATION
     # ----------------------------------------------------------------------
@@ -418,7 +528,7 @@ class FeatureEngine:
                     else:
                         log.warning(f"Could not calculate {vol_sma_name} for {symbol} {timeframe}")
 
-                # --- ✅ NEW: ATR Calculation ---
+                # --- ATR Calculation ---
                 if timeframe == ATR_TIMEFRAME:
                     df.ta.atr(length=14, append=True, col_names=("ATR_14",))
                     if "ATR_14" in df.columns:
@@ -482,9 +592,6 @@ class FeatureEngine:
         tfi = self._calculate_tfi(symbol)
         self.features[symbol]["tfi"] = tfi
         
-        # ✅ FIX: This is no longer called here. It's only called on new candles.
-        # self._calculate_technical_indicators(symbol)
-        
         self.features[symbol]["timestamp"] = timestamp_us
 
         if self.features[symbol]["mid_price"] is not None:
@@ -498,6 +605,7 @@ class FeatureEngine:
                 "tfi": self.features[symbol]["tfi"],
                 "mark_price": self.features[symbol]["mark_price"],
                 "funding_rate": self.features[symbol]["funding_rate"],
+                "spot_price": self.features[symbol].get("spot_price"), 
                 "tas": self.features[symbol]["tas"],
                 
                 "PWH": self.features[symbol].get("PWH"),
@@ -534,9 +642,13 @@ class FeatureEngine:
                 symbol = None 
                 
                 try:
+                    # Logic to extract symbol for non-spot messages
                     if msg_type == "mark_price":
                         raw_sym = raw.get("symbol")
                         if raw_sym: symbol = raw_sym.split(":", 1)[-1] 
+                    elif msg_type == "v2/spot_price":
+                        self._handle_spot_price(raw)
+                        continue 
                     else:
                         symbol = raw.get("symbol") 
                     

@@ -1,5 +1,5 @@
 # --- historical_data_fetcher.py ---
-# Complete Updated File (Fixing Time Format)
+# Complete Updated File (Optimized for 2000 candle limit and larger chunks)
 
 import asyncio
 import aiohttp
@@ -12,14 +12,14 @@ import os
 from config import DELTA_BASE_URL, USER_AGENT, TRADING_SYMBOLS
 
 # --- Configuration ---
-DAYS_TO_FETCH = 180        # The total historical range we want (6 months)
+DAYS_TO_FETCH = 365        # The total historical range we want (1 year for better S/R)
 TRAINING_TIMEFRAME = "5m"  # The FINAL candle size for our training data
-FETCH_CHUNK_DAYS = 18      # How many days of data to request per API call (optimization)
+FETCH_CHUNK_DAYS = 30      # Fetch 30 days at a time 
 # --------------------
 
 DATA_DIR = "data"        
 OUTPUT_FILE = os.path.join(DATA_DIR, "historical_candles.csv")
-API_LIMIT = 1000 
+API_LIMIT = 2000 # ✅ UPDATED: Max API limit per request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,27 +52,28 @@ async def fetch_candle_chunk(session, symbol, resolution, start_time, end_time, 
         return []
 
 async def fetch_all_data_for_symbol(session, symbol):
-    """Continuously fetches 5m data in large chunks for a single symbol."""
+    """Continuously fetches 5m data backwards in chunks for a single symbol."""
     log.info(f"Starting download for {symbol}...")
     all_candles = []
     
     end_date = datetime.now()
-    current_start_date = end_date - timedelta(days=DAYS_TO_FETCH)
+    fetch_start_date = end_date - timedelta(days=DAYS_TO_FETCH)
     
-    timeframe_seconds = 300 
+    current_end_date = end_date
 
-    while current_start_date < end_date:
+    while current_end_date > fetch_start_date:
         
-        chunk_end_date = current_start_date + timedelta(days=FETCH_CHUNK_DAYS)
+        # Calculate the chunk's start date
+        chunk_start_date = current_end_date - timedelta(days=FETCH_CHUNK_DAYS)
+        if chunk_start_date < fetch_start_date:
+            chunk_start_date = fetch_start_date
         
-        if chunk_end_date > end_date:
-            chunk_end_date = end_date
+        start_ts = int(chunk_start_date.timestamp())
+        end_ts = int(current_end_date.timestamp())
 
-        start_ts = int(current_start_date.timestamp())
-        end_ts = int(chunk_end_date.timestamp())
-
-        log.info(f"Fetching {symbol} chunk: {current_start_date.strftime('%Y-%m-%d')} to {chunk_end_date.strftime('%Y-%m-%d')}")
+        log.info(f"Fetching {symbol} chunk: {chunk_start_date.strftime('%Y-%m-%d')} to {current_end_date.strftime('%Y-%m-%d')}")
         
+        # Fetching backward in time (up to current_end_date)
         candles = await fetch_candle_chunk(
             session, 
             symbol, 
@@ -83,13 +84,14 @@ async def fetch_all_data_for_symbol(session, symbol):
         )
         
         if not candles:
-            log.warning(f"No candles returned for {symbol} in chunk {current_start_date}. Assuming download is complete.")
-            break
+            log.warning(f"No candles returned for {symbol} in chunk ending {current_end_date.strftime('%Y-%m-%d')}. Stopping.")
+            # Break if no data is returned, assuming we hit the start of history
+            break 
             
         all_candles.extend(candles)
         
-        # Move the start date for the next chunk to the end time of the current chunk
-        current_start_date = chunk_end_date
+        # Move the end date for the next chunk backward to the start of the current chunk
+        current_end_date = chunk_start_date
         
         await asyncio.sleep(0.5) 
 
