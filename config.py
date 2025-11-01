@@ -21,6 +21,13 @@ DELTA_BASE_URL = "https://api.india.delta.exchange"
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # ----------------------------------------------------------------------
+# ✅ Deadman Switch Configuration - FIX ADDED FOR DMS_ID
+# ----------------------------------------------------------------------
+# IMPORTANT: This must be a unique string identifier for your bot/instance.
+# Best practice is to set this in your .env file: DMS_ID=your_unique_id
+DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
+
+# ----------------------------------------------------------------------
 # ✅ Trading Symbols & Markets
 # ----------------------------------------------------------------------
 TRADING_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD"]  

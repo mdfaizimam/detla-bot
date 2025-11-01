@@ -1,5 +1,5 @@
 # --- executor.py ---
-# Complete Updated File (Rollback to Static Sizing/Fixed Rounding)
+# Complete Updated File (With Precision Fix and Deadman Switch)
 
 import aiohttp
 import asyncio
@@ -8,6 +8,7 @@ import logging
 import time
 import urllib.parse
 from redis import asyncio as aioredis
+from typing import Optional, Any, Dict
 
 from config import (
     DELTA_BASE_URL,
@@ -17,7 +18,9 @@ from config import (
     MONITORING_CHANNEL,
     config,
     USER_AGENT,
-    TRADING_SYMBOLS 
+    TRADING_SYMBOLS,
+    # ASSUMPTION: DMS_ID is now configured
+    DMS_ID 
 )
 from utils.signing import generate_server_synced_signature
 from risk_manager import RiskManager 
@@ -40,7 +43,9 @@ class OrderExecutionManager:
         
         self.api_key = API_KEY
         self.api_secret = API_SECRET
-
+        self.dms_id = DMS_ID # Use the DMS ID from config
+        self.product_info_cache = {} # NEW: Cache for product info/tick size
+        
         logger.info("✅ OrderExecutionManager initialized.")
 
     async def close(self):
@@ -71,24 +76,50 @@ class OrderExecutionManager:
         except Exception as e:
             logger.error("❌ Error releasing lock: %s", e)
 
-    # Rollback to old simple ID fetcher
-    async def _get_product_id(self, symbol: str):
-        path = "/v2/products"
-        # Use the general product endpoint and query the symbol
-        params = {"symbol": symbol}
-        url = f"{DELTA_BASE_URL}{path}" 
+    # NEW: Fetches and caches product details including ID and tick_size/precision.
+    async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetches product details including tick_size/precision and caches them."""
+        if symbol in self.product_info_cache:
+            return self.product_info_cache[symbol]
+
+        # Use the dedicated endpoint GET /v2/products/{symbol} [cite: 149]
+        path = f"/v2/products/{symbol}" 
+        url = f"{DELTA_BASE_URL}{path}"
+        
         try:
-            async with self.session.get(url, params=params, headers={'User-Agent': config.get('USER_AGENT')}) as resp:
+            async with self.session.get(url, headers={'User-Agent': USER_AGENT}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    # Safely extract ID, assuming the desired product is returned first or alone
-                    products = data.get("result", [{}])
-                    product = products[0] if isinstance(products, list) else products
-                    return product.get("id")
-            logger.error(f"❌ Product ID not found for {symbol} (HTTP {resp.status})")
-            return None
+                    product = data.get("result", {})
+                    
+                    if product:
+                        product_id = product.get("id")
+                        tick_size_str = product.get("tick_size")
+                        
+                        if product_id and tick_size_str:
+                            try:
+                                # Calculate the number of decimal places for rounding
+                                if '.' in tick_size_str:
+                                    # Get number of digits after the decimal point
+                                    precision = len(tick_size_str.split('.')[-1])
+                                else:
+                                    precision = 0
+
+                                info = {
+                                    "id": product_id,
+                                    "tick_size": float(tick_size_str),
+                                    "precision": precision
+                                }
+                                self.product_info_cache[symbol] = info
+                                return info
+                            except ValueError as ve:
+                                logger.error(f"Invalid tick_size format received for {symbol}: {tick_size_str} -> {ve}")
+                                return None
+
+                logger.error(f"❌ Product info not found for {symbol} (HTTP {resp.status})")
+                return None
         except Exception as e:
-            logger.error(f"❌ Error fetching product ID for {symbol}: {e}", exc_info=True)
+            logger.error(f"❌ Error fetching product info for {symbol}: {e}", exc_info=True)
             return None
 
 
@@ -115,6 +146,7 @@ class OrderExecutionManager:
                     data = await resp.json()
                     return data.get("result", {})
                 else:
+                    logger.error(f"❌ Failed to fetch position {product_id}. HTTP Status: {resp.status}")
                     return None
         except Exception as e:
             logger.error(f"❌ Error fetching position {product_id}: {e}")
@@ -126,10 +158,10 @@ class OrderExecutionManager:
         
         product_id_map = {}
         for symbol in TRADING_SYMBOLS:
-            # Revert to old simple ID fetching
-            product_id = await self._get_product_id(symbol) 
-            if product_id:
-                product_id_map[symbol] = product_id
+            # Use the new product info fetcher
+            product_info = await self._get_product_info(symbol) 
+            if product_info:
+                product_id_map[symbol] = product_info['id']
             await asyncio.sleep(0.2) 
 
         if not product_id_map:
@@ -157,21 +189,28 @@ class OrderExecutionManager:
         logger.info("✅ No pre-existing positions found. Ready for new signals.")
 
 
-    # Rollback to old _place_bracket_order with static rounding
+    # UPDATED: Implements tick_size precision logic - CRITICAL FIX
     async def _place_bracket_order(self, symbol: str, side: str, size: float, tp_price: float, sl_price: float):
-        """Places the bracket order. Returns product_id on success, None on failure."""
+        """Places the bracket order with correct tick size precision. Returns product_id on success, None on failure."""
         
-        product_id = await self._get_product_id(symbol) # Static ID fetching
-        if not product_id:
-            logger.error(f"❌ Product ID missing for {symbol}. Blocking trade.")
+        product_info = await self._get_product_info(symbol) 
+        if not product_info:
+            logger.error(f"❌ Product Info missing for {symbol}. Blocking trade.")
             return None
         
-        # Arbitrary rounding (rollback from tick_size)
-        final_tp_price = round(tp_price, 2)
-        final_sl_price = round(sl_price, 2)
+        product_id = product_info["id"]
+        precision = product_info["precision"]
+        
+        # CRITICAL FIX: Round price to the required tick size precision
+        final_tp_price = round(tp_price, precision)
+        final_sl_price = round(sl_price, precision)
+        
+        # Format numbers as strings for full precision to the API [cite: 120]
+        final_tp_price_str = f"{final_tp_price:.{precision}f}"
+        final_sl_price_str = f"{final_sl_price:.{precision}f}"
 
-        logger.info("📊 [%s] Placing order: Side=%s, Size=%.2f | TP=%.2f | SL=%.2f", 
-                    symbol, side, size, final_tp_price, final_sl_price)
+        logger.info("📊 [%s] Placing order: Side=%s, Size=%.2f | TP=%s | SL=%s (Precision: %d)", 
+                    symbol, side, size, final_tp_price_str, final_sl_price_str, precision)
 
         trigger_method = config.get("BRACKET_STOP_TRIGGER", "last_traded_price")
 
@@ -181,13 +220,14 @@ class OrderExecutionManager:
             "side": side,
             "order_type": "market_order",
             "bracket_stop_trigger_method": trigger_method,
-            "bracket_take_profit_price": str(final_tp_price),
-            "bracket_take_profit_limit_price": str(final_tp_price), 
-            "bracket_stop_loss_price": str(final_sl_price)
+            "bracket_take_profit_price": final_tp_price_str,
+            "bracket_take_profit_limit_price": final_tp_price_str, 
+            "bracket_stop_loss_price": final_sl_price_str
         }
 
         logger.info(f"📦 Placing native bracket order: {combined_payload}")
-        order_resp = await self._send_order(combined_payload)
+        # Use generic sender for POST /v2/orders
+        order_resp = await self._send_order("POST", "/v2/orders", combined_payload) 
 
         if not order_resp.get("success"):
             logger.error("❌ Native bracket order failed: %s", order_resp)
@@ -197,12 +237,13 @@ class OrderExecutionManager:
         logger.info(f"🎯 Native Bracket Order Placed Successfully. Entry Order ID: {order_id}")
         return product_id 
 
-    async def _send_order(self, payload: dict):
-        path = "/v2/orders"
-        url = f"{DELTA_BASE_URL}{path}"
-        body = json.dumps(payload)
+    # NEW: Generic signed request sender for DMS and Orders
+    async def _dms_send_request(self, method: str, path: str, payload: Optional[dict] = None) -> dict:
+        """Sends a signed authenticated request."""
+        body = json.dumps(payload) if payload else ""
         
-        signature, timestamp = await generate_server_synced_signature("POST", path, body, "")
+        # Note: Query parameters are generally omitted for POST/PUT/DELETE
+        signature, timestamp = await generate_server_synced_signature(method, path, body, "") 
         
         headers = {
             "api-key": self.api_key,
@@ -212,18 +253,71 @@ class OrderExecutionManager:
             "User-Agent": USER_AGENT
         }
         
+        url = f"{DELTA_BASE_URL}{path}"
+        
         try:
-            async with self.session.post(url, data=body, headers=headers) as resp:
+            async with self.session.request(method, url, data=body, headers=headers) as resp:
                 try:
                     response_json = await resp.json()
-                    logger.debug(f"API Response ({resp.status}): {response_json}")
                     return response_json
                 except Exception as e:
-                    logger.error(f"Failed to decode API response: {e}")
+                    logger.error(f"Failed to decode API response for {path}: {e}")
                     return {"success": False, "error": f"HTTP {resp.status}"}
         except Exception as e:
-            logger.error(f"Error sending order: {e}", exc_info=True)
+            logger.error(f"Error sending request to {path}: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
+
+    # Updated _send_order to use _dms_send_request internally
+    async def _send_order(self, method: str, path: str, payload: dict) -> dict:
+        return await self._dms_send_request(method, path, payload)
+        
+    # NEW: Deadman Switch Logic (Robustness Feature)
+    async def _dms_create_heartbeat(self):
+        """Register the Deadman Switch with the exchange to cancel orders on failure. [cite: 473]"""
+        path = "/v2/heartbeat/create"
+        payload = {
+            "heartbeat_id": self.dms_id,
+            "impact": "contracts",
+            "contract_types": ["perpetual_futures"],
+            # Setting unhealthy_count to 1 means the first missed ACK cancels all open orders [cite: 479]
+            "config": [{"action": "cancel_orders", "unhealthy_count": 1}] 
+        }
+        resp = await self._dms_send_request("POST", path, payload)
+        if resp.get("success"):
+            logger.info("✅ Deadman Switch Heartbeat created successfully.")
+        else:
+            logger.error(f"❌ Failed to create Deadman Switch: {resp}")
+        
+    async def _dms_send_acknowledgment(self, ttl_ms: int = 30000):
+        """Send periodic acknowledgment to keep the switch alive. [cite: 475]"""
+        path = "/v2/heartbeat"
+        payload = {"heartbeat_id": self.dms_id, "ttl": ttl_ms}
+        resp = await self._dms_send_request("POST", path, payload)
+        if resp.get("success"):
+            logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
+        else:
+            logger.warning(f"⚠️ DMS Acknowledgment failed: {resp}")
+
+    async def _dms_loop(self):
+        """Starts the continuous DMS acknowledgment loop."""
+        if not self.dms_id:
+            logger.warning("🚫 DMS_ID not set in config. Deadman Switch disabled.")
+            return
+
+        await self._dms_create_heartbeat()
+        
+        while True:
+            try:
+                # Send acknowledgment just before the TTL expires (TTL: 30s) [cite: 482]
+                await self._dms_send_acknowledgment() 
+                await asyncio.sleep(25) 
+            except asyncio.CancelledError:
+                logger.info("DMS loop cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"💥 DMS loop crashed: {e}", exc_info=True)
+                await asyncio.sleep(5) # Wait and retry
+
 
     async def _process_signal(self, signal: dict):
         # Rollback to static sizing
@@ -291,6 +385,9 @@ class OrderExecutionManager:
             logger.info(f"Monitor confirmed tracking for {msg.get('symbol')}")
 
     async def start(self):
+        # Start the Deadman Switch before reconciling or trading
+        asyncio.create_task(self._dms_loop())
+        
         # Revert to old reconciliation logic
         await self._reconcile_open_positions()
 

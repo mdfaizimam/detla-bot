@@ -28,7 +28,7 @@ async def generate_server_synced_signature(method: str, path: str, body: str = "
     """
     timestamp = int(time.time())
 
-    # ✅ FIX: Include query parameters in signature message
+    # The signature message includes Method, Timestamp, Path, Query Params, and Body [cite: 89]
     if query_params:
         message = f"{method.upper()}{timestamp}{path}?{query_params}{body}"
     else:
@@ -45,21 +45,33 @@ async def generate_server_synced_signature(method: str, path: str, body: str = "
     return signature, timestamp
 
 # ----------------------------------------------------------------------
-# ✅ WS Authentication payload (for private WS channels)
+# ✅ WS Authentication payload (for private WS channels) - CRITICAL FIX
 # ----------------------------------------------------------------------
 def generate_ws_keyauth_signature_for_live():
-    """WebSocket authentication payload builder."""
-    timestamp = int(time.time() * 1000)  # ms
-    message = f"{timestamp}{API_KEY}"
+    """
+    WebSocket authentication payload builder for the new 'key-auth' method.
+    
+    CRITICAL FIX: Uses the correct message format and timestamp in seconds.
+    """
+    # Timestamp must be in seconds (int) [cite: 540]
+    timestamp = int(time.time()) 
+    
+    # Signature message format: 'GET' + string(TIMESTAMP) + '/live' [cite: 541]
+    method = 'GET'
+    path = '/live'
+    signature_data = f"{method}{timestamp}{path}"
+    
     signature = hmac.new(
         API_SECRET.encode("utf-8"),
-        message.encode("utf-8"),
+        signature_data.encode("utf-8"),
         hashlib.sha256
     ).hexdigest()
+    
     return {
-        "type": "auth",
+        # Payload uses 'key-auth' type and 'api-key' key [cite: 539]
+        "type": "key-auth", 
         "payload": {
-            "api_key": API_KEY,
+            "api-key": API_KEY, 
             "signature": signature,
             "timestamp": timestamp
         }

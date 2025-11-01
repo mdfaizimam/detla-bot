@@ -35,10 +35,15 @@ class WebSocketManager:
 
         try:
             logger.info(f"🔌 Connecting to WS: {self.ws_url}")
+            # Use AIOHTTP's native heartbeat, but rely on Delta's app-level one too
             self.ws = await self.session.ws_connect(self.ws_url, heartbeat=30, headers={'User-Agent': USER_AGENT})
             self.reconnect_delay = 3  # reset delay after successful connect
 
             logger.info("✅ Connected to Delta WebSocket")
+            
+            # NEW ROBUSTNESS: Enable application-level heartbeat 
+            await self.ws.send_json({"type": "enable_heartbeat"}) 
+            logger.info("❤️ Sent request to enable Delta WebSocket heartbeat.")
 
             await self.subscribe_public_channels()
             await self.authenticate()
@@ -51,25 +56,21 @@ class WebSocketManager:
         try:
             if self.is_authenticated:
                 return
+            # CRITICAL FIX: Calls the updated function which returns 'key-auth' type and correct signature
             auth_payload = generate_ws_keyauth_signature_for_live()
             await self.ws.send_json(auth_payload)
             logger.info("🔐 Sent authentication payload to WebSocket")
         except Exception as e:
             logger.error(f"❌ Authentication error: {e}")
 
-    # ----------------------------------------------------------------------
-    # ✅ MODIFIED FUNCTION
-    # ----------------------------------------------------------------------
     async def subscribe_public_channels(self):
         """Subscribe to all public market data streams."""
         
         standard_symbols = TRADING_SYMBOLS
         mark_price_symbols = [f"MARK:{symbol}" for symbol in standard_symbols]
         
-        # ✅ NEW: Define all candle resolutions
         candle_resolutions = ["1m", "5m", "15m", "1h", "4h", "1d"]
         
-        # ✅ NEW: Build the list of channel payloads
         channels_payload = [
             # --- Core Analysis Streams ---
             {"name": "v2/ticker", "symbols": standard_symbols},
@@ -81,16 +82,12 @@ class WebSocketManager:
             {"name": "mark_price", "symbols": mark_price_symbols}
         ]
         
-        # ✅ NEW: Add all candle channels to the payload
         for res in candle_resolutions:
             channels_payload.append({
                 "name": f"candlestick_{res}",
                 "symbols": standard_symbols
             })
             
-        # NOTE: We are still omitting 'spot_price' as it requires
-        # a separate symbol mapping in config.py, which we can add later.
-
         payload = {
             "type": "subscribe",
             "payload": {
@@ -103,7 +100,7 @@ class WebSocketManager:
             
             subscribed_channels = [ch['name'] for ch in channels_payload]
             logger.info(f"📈 Subscribed to {len(subscribed_channels)} channels for {TRADING_SYMBOLS}")
-            logger.debug(f"Subscribed to: {subscribed_channels}") # Debug log for full list
+            logger.debug(f"Subscribed to: {subscribed_channels}")
             
         except Exception as e:
             logger.error(f"❌ Failed to subscribe to public channels: {e}")
@@ -153,16 +150,20 @@ class WebSocketManager:
                         # Log all non-noise messages
                         logger.info(f"🛰️ WS Message: {msg_type}")
 
-                    if msg_type == "key-auth" and data.get("success"):
-                        self.is_authenticated = True
-                        logger.info("✅ Authenticated successfully")
-                        await self.subscribe_private_channels()
+                    # CRITICAL FIX: Handle the new 'key-auth' response type 
+                    if msg_type == "key-auth":
+                        if data.get("success"):
+                            self.is_authenticated = True
+                            logger.info("✅ Authenticated successfully")
+                            await self.subscribe_private_channels()
+                        else:
+                            logger.error(f"❌ Authentication Failed: {data.get('message', 'Unknown error')}")
                         continue
                     
-                    if msg_type == "key-auth" and not data.get("success"):
-                        logger.error(f"❌ Authentication Failed: {data.get('message', 'Unknown error')}")
-                        continue
-
+                    # NEW ROBUSTNESS: Handle Delta's application-level heartbeat message 
+                    if msg_type == "heartbeat":
+                         continue
+                         
                     try:
                         if msg_type not in ("subscriptions", "key-auth"):
                             await self.redis.publish(RAW_CHANNEL, json.dumps(data))
@@ -197,7 +198,7 @@ class WebSocketManager:
         self.reconnect_delay = min(self.reconnect_delay * self.backoff_factor, self.reconnect_max)
 
         if not self._stop_flag:
-            await self.connect() # Relaunch connect, which will start subscriptions
+            await self.connect()
 
     async def close(self):
         """Gracefully close all resources."""
