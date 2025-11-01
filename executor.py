@@ -402,7 +402,7 @@ class OrderExecutionManager:
                 if msg.get("type") != "message":
                     continue
                 
-                channel = msg['channel'].decode('utf-8') 
+                channel = msg['channel']
                 data_str = msg['data']
 
                 try:
