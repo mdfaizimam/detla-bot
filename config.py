@@ -1,5 +1,5 @@
 # --- config.py ---
-# Complete Updated File (Stable AI Configuration)
+# Complete Updated File (with Spot Index Symbols and Control Channel)
 
 import os
 from pathlib import Path
@@ -21,11 +21,21 @@ DELTA_BASE_URL = "https://api.india.delta.exchange"
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # ----------------------------------------------------------------------
-# ✅ Deadman Switch Configuration - FIX ADDED FOR DMS_ID
+# ✅ Deadman Switch Configuration 
 # ----------------------------------------------------------------------
 # IMPORTANT: This must be a unique string identifier for your bot/instance.
-# Best practice is to set this in your .env file: DMS_ID=your_unique_id
+# Ensure this is set in your .env file or manually set a unique value here.
 DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
+
+# ----------------------------------------------------------------------
+# ✅ Spot Index Symbols (For v2/spot_price WS subscription)
+# ----------------------------------------------------------------------
+# BTCUSD uses .DEXBTUSD, others follow .DE<Underlying><Quoting>
+SPOT_INDEX_SYMBOLS = {
+    "BTCUSD": ".DEXBTUSD",
+    "ETHUSD": ".DEETHUSD", 
+    "SOLUSD": ".DESOLUSD"
+}
 
 # ----------------------------------------------------------------------
 # ✅ Trading Symbols & Markets
@@ -110,6 +120,7 @@ SIGNAL_CHANNEL = "delta:signals"
 EXECUTION_CHANNEL = "delta:executions"
 ERROR_CHANNEL = "delta:errors"
 MONITORING_CHANNEL = "delta:monitoring"
+CONTROL_CHANNEL = "delta:control" # <--- NEW CHANNEL ADDED
 
 REDIS_DATA_TTL = 3600
 CACHE_EXPIRY = 300
@@ -132,7 +143,7 @@ config = {
     "max_position_pct": MAX_POSITION_SIZE * 100,
     "BASE_POSITION_SIZE": BASE_POSITION_SIZE,
     "MIN_RISK_REWARD_RATIO": MIN_RISK_REWARD_RATIO,
-    "PRODUCT_SPECS": {}, # Rollback: No dynamic fetching required
+    "PRODUCT_SPECS": {}, 
 
     # Smart TP/SL
     "ATR_TIMEFRAME": ATR_TIMEFRAME,
