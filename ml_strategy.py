@@ -1,5 +1,5 @@
 # --- ml_strategy.py ---
-# Complete Updated File (Stable AI Integration with Static Sizing)
+# Complete Updated File (Reverted to Static Sizing)
 
 import asyncio
 import json
@@ -59,6 +59,7 @@ class MLForecastingStrategy:
         self._redis = redis_client
         self.latest_valid_signals: Dict[str, Dict] = {}
         self.priority_list = PRIORITY_LIST
+        self._risk_manager = None # Placeholder for RiskManager instance
         log.info(f"Priority list loaded: {' -> '.join(self.priority_list)}")
         
         self.volume_sma_key = f"SMA_volume_{VOLUME_SMA_PERIOD}"
@@ -282,7 +283,7 @@ class MLForecastingStrategy:
                 return None # Failed ML check
             
             
-            # ✅ Static position sizing
+            # ✅ STATIC position sizing
             contracts_final = BASE_POSITION_SIZE 
             
             
@@ -328,6 +329,11 @@ class MLForecastingStrategy:
                     if symbol in self.latest_valid_signals:
                         signal_to_send = self.latest_valid_signals.pop(symbol) 
                         
+                        # --- STATIC SIZING CHECK (Ensures trade size > 0 before firing) ---
+                        if signal_to_send.get("size_hint", 0) <= 0:
+                            log.warning(f"🚫 Cannot fire signal for {symbol}: size_hint is non-positive.")
+                            continue
+                            
                         log.info(f"🏆 Firing trade for high-priority symbol: {symbol}")
                         await self._publish_signal(signal_to_send)
                         
@@ -342,9 +348,10 @@ class MLForecastingStrategy:
                 log.error(f"Error in decision loop: {e}", exc_info=True)
                 await asyncio.sleep(5) 
 
-    async def start(self):
+    async def start(self, risk_manager): # ✅ UPDATED: Accepts risk_manager
         pubsub = self._redis.pubsub()
         await pubsub.subscribe(ENRICHED_CHANNEL)
+        self._risk_manager = risk_manager # Store the risk manager reference
         log.info(f"🎯 Heuristic Strategy subscribed to {ENRICHED_CHANNEL}")
 
         decision_task = asyncio.create_task(self._decision_loop())

@@ -1,10 +1,11 @@
+# --- main.py ---
 import asyncio
 import signal
 import logging
 import logging.handlers  
 import os                
 import aiohttp
-from redis import asyncio as aioredis
+from redis import asyncio as aioredis 
 import queue 
 
 from ws_manager import WebSocketManager
@@ -12,6 +13,7 @@ from feature_engine import FeatureEngine
 from ml_strategy import MLForecastingStrategy
 from executor import OrderExecutionManager
 from monitor import PositionMonitor
+from risk_manager import RiskManager # Import RiskManager
 from config import REDIS_URL, config
 
 # --- Systematic Logging Setup (FIXED FOR THREAD-SAFETY) ---
@@ -79,18 +81,24 @@ async def run_bot():
         http_session = aiohttp.ClientSession()
         logger.info("🔗 HTTP ClientSession created")
 
-        # The rest of your component initialization remains here.
+        # --- Component Initialization and Startup ---
         ws_manager = WebSocketManager(redis_client, http_session)
         feature_engine = FeatureEngine(redis_client, http_session) 
-        strategy = MLForecastingStrategy(redis_client)
-        executor = OrderExecutionManager(redis_client, http_session)
+        
+        # ✅ UPDATED: Instantiate RiskManager and load state
+        risk_manager = RiskManager(redis_client)
+        await risk_manager._load_state_from_redis()
+
+        # ✅ UPDATED: Pass risk_manager reference to MLStrategy and Executor
+        strategy = MLForecastingStrategy(redis_client) 
+        executor = OrderExecutionManager(redis_client, http_session, risk_manager)
         position_monitor = PositionMonitor(redis_client, http_session)
 
         # Start all services concurrently
         tasks = [
             asyncio.create_task(ws_manager.start(), name="WebSocketHandler"),
             asyncio.create_task(feature_engine.start(), name="FeatureEngine"),
-            asyncio.create_task(strategy.start(), name="MLStrategy"),
+            asyncio.create_task(strategy.start(risk_manager), name="MLStrategy"), # Pass risk_manager to start()
             asyncio.create_task(executor.start(), name="OrderExecutor"),
             asyncio.create_task(position_monitor.start(), name="PositionMonitor"),
         ]
