@@ -1,5 +1,5 @@
 # --- executor.py ---
-# Complete Updated File (With Precision Fix and Deadman Switch)
+# Complete Updated File (With Precision Fix, Deadman Switch, and Network Retry)
 
 import aiohttp
 import asyncio
@@ -7,6 +7,8 @@ import json
 import logging
 import time
 import urllib.parse
+# FIX: Import client exceptions for error handling
+from aiohttp import client_exceptions
 from redis import asyncio as aioredis
 from typing import Optional, Any, Dict
 
@@ -32,6 +34,10 @@ logger.setLevel(logging.INFO)
 class OrderExecutionManager:
     REDIS_POSITION_LOCK_KEY = "active_position" 
     REDIS_POSITION_LOCK_TTL = 60
+    
+    # FIX: Add retry constants for transient network errors
+    MAX_RETRIES = 3 
+    RETRY_DELAY = 1.0
 
     def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession):
         self.session = http_session 
@@ -82,7 +88,7 @@ class OrderExecutionManager:
         if symbol in self.product_info_cache:
             return self.product_info_cache[symbol]
 
-        # Use the dedicated endpoint GET /v2/products/{symbol} [cite: 149]
+        # Use the dedicated endpoint GET /v2/products/{symbol}
         path = f"/v2/products/{symbol}" 
         url = f"{DELTA_BASE_URL}{path}"
         
@@ -205,7 +211,7 @@ class OrderExecutionManager:
         final_tp_price = round(tp_price, precision)
         final_sl_price = round(sl_price, precision)
         
-        # Format numbers as strings for full precision to the API [cite: 120]
+        # Format numbers as strings for full precision to the API
         final_tp_price_str = f"{final_tp_price:.{precision}f}"
         final_sl_price_str = f"{final_sl_price:.{precision}f}"
 
@@ -237,9 +243,9 @@ class OrderExecutionManager:
         logger.info(f"🎯 Native Bracket Order Placed Successfully. Entry Order ID: {order_id}")
         return product_id 
 
-    # NEW: Generic signed request sender for DMS and Orders
+    # UPDATED: Generic signed request sender for DMS and Orders with retry logic
     async def _dms_send_request(self, method: str, path: str, payload: Optional[dict] = None) -> dict:
-        """Sends a signed authenticated request."""
+        """Sends a signed authenticated request with retry logic for network errors."""
         body = json.dumps(payload) if payload else ""
         
         # Note: Query parameters are generally omitted for POST/PUT/DELETE
@@ -255,17 +261,33 @@ class OrderExecutionManager:
         
         url = f"{DELTA_BASE_URL}{path}"
         
-        try:
-            async with self.session.request(method, url, data=body, headers=headers) as resp:
-                try:
-                    response_json = await resp.json()
-                    return response_json
-                except Exception as e:
-                    logger.error(f"Failed to decode API response for {path}: {e}")
-                    return {"success": False, "error": f"HTTP {resp.status}"}
-        except Exception as e:
-            logger.error(f"Error sending request to {path}: {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
+        # FIX: Implement retry loop for transient network errors
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                async with self.session.request(method, url, data=body, headers=headers) as resp:
+                    try:
+                        response_json = await resp.json()
+                        return response_json
+                    except Exception as e:
+                        # Log and treat as a failure if decoding fails but HTTP succeeded (rare)
+                        logger.error(f"Failed to decode API response for {path}: {e}")
+                        return {"success": False, "error": f"HTTP {resp.status} - Decode Failed"}
+            
+            # Catch transient network errors for retries
+            except (client_exceptions.ServerDisconnectedError, asyncio.TimeoutError) as e:
+                if attempt < self.MAX_RETRIES:
+                    logger.warning(f"Server connection error on {path} (Attempt {attempt}/{self.MAX_RETRIES}). Retrying in {self.RETRY_DELAY:.1f}s... Error: {type(e).__name__}")
+                    await asyncio.sleep(self.RETRY_DELAY)
+                else:
+                    logger.error(f"❌ API request to {path} failed after {self.MAX_RETRIES} attempts. Error: {type(e).__name__}", exc_info=True)
+                    return {"success": False, "error": str(e)}
+            
+            # Catch all other exceptions (e.g., DNS error, other non-retriable exceptions)
+            except Exception as e:
+                logger.error(f"❌ Unhandled error sending request to {path} on attempt {attempt}: {e}", exc_info=True)
+                return {"success": False, "error": str(e)}
+
+        return {"success": False, "error": "Max retries exceeded"}
 
     # Updated _send_order to use _dms_send_request internally
     async def _send_order(self, method: str, path: str, payload: dict) -> dict:
@@ -273,13 +295,13 @@ class OrderExecutionManager:
         
     # NEW: Deadman Switch Logic (Robustness Feature)
     async def _dms_create_heartbeat(self):
-        """Register the Deadman Switch with the exchange to cancel orders on failure. [cite: 473]"""
+        """Register the Deadman Switch with the exchange to cancel orders on failure."""
         path = "/v2/heartbeat/create"
         payload = {
             "heartbeat_id": self.dms_id,
             "impact": "contracts",
             "contract_types": ["perpetual_futures"],
-            # Setting unhealthy_count to 1 means the first missed ACK cancels all open orders [cite: 479]
+            # Setting unhealthy_count to 1 means the first missed ACK cancels all open orders
             "config": [{"action": "cancel_orders", "unhealthy_count": 1}] 
         }
         resp = await self._dms_send_request("POST", path, payload)
@@ -289,13 +311,14 @@ class OrderExecutionManager:
             logger.error(f"❌ Failed to create Deadman Switch: {resp}")
         
     async def _dms_send_acknowledgment(self, ttl_ms: int = 30000):
-        """Send periodic acknowledgment to keep the switch alive. [cite: 475]"""
+        """Send periodic acknowledgment to keep the switch alive."""
         path = "/v2/heartbeat"
         payload = {"heartbeat_id": self.dms_id, "ttl": ttl_ms}
         resp = await self._dms_send_request("POST", path, payload)
         if resp.get("success"):
             logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
         else:
+            # FIX: Only log as warning here, the retry loop will have handled the transient error
             logger.warning(f"⚠️ DMS Acknowledgment failed: {resp}")
 
     async def _dms_loop(self):
@@ -308,7 +331,7 @@ class OrderExecutionManager:
         
         while True:
             try:
-                # Send acknowledgment just before the TTL expires (TTL: 30s) [cite: 482]
+                # Send acknowledgment just before the TTL expires (TTL: 30s)
                 await self._dms_send_acknowledgment() 
                 await asyncio.sleep(25) 
             except asyncio.CancelledError:
