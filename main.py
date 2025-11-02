@@ -1,6 +1,8 @@
 import asyncio
 import signal
 import logging
+import logging.handlers  # <-- Added for file rotation
+import os                # <-- Added to create 'logs' directory
 import aiohttp
 from redis import asyncio as aioredis
 
@@ -11,11 +13,49 @@ from executor import OrderExecutionManager
 from monitor import PositionMonitor
 from config import REDIS_URL, config
 
-logging.basicConfig(
-    level=config["LOG_LEVEL"] if config["LOG_LEVEL"] else logging.DEBUG, # <-- Use config dictionary
-    format="%(asctime)s [%(levelname)s] [%(name)s]: %(message)s"
+# --- Systematic Logging Setup ---
+
+# 1. Define Log Directory and ensure it exists
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+log_file_path = os.path.join(LOG_DIR, "bot.log")
+
+# 2. Get the root logger
+# We configure the root logger so all modules (executor, monitor, etc.) inherit this setup
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)  # Set root level to DEBUG to capture everything
+
+# 3. Create a consistent formatter
+log_formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] [%(name)s]: %(message)s"
 )
+
+# 4. Console Handler (prints to screen)
+# Use the LOG_LEVEL from your config for the console
+console_level = config.get("LOG_LEVEL", logging.INFO) # Use .get for safety
+console_handler = logging.StreamHandler()
+console_handler.setLevel(console_level)
+console_handler.setFormatter(log_formatter)
+
+# 5. File Handler (saves to file, rotates daily)
+# This handler will write ALL messages (DEBUG and up) to the file
+file_handler = logging.handlers.TimedRotatingFileHandler(
+    log_file_path,
+    when="midnight",  # Rotate at midnight
+    backupCount=7,    # Keep 7 days of logs
+    encoding="utf-8"
+)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(log_formatter)
+
+# 6. Add both handlers to the root logger
+root_logger.addHandler(console_handler)
+root_logger.addHandler(file_handler)
+
+# 7. Get the logger for this main file
 logger = logging.getLogger("main")
+
+# --- End of Logging Setup ---
 
 
 async def run_bot():
@@ -132,7 +172,7 @@ if __name__ == "__main__":
         # ✅ FIX: Use asyncio.run() to create and manage the loop
         asyncio.run(supervisor())
     except asyncio.CancelledError:
-        # Expected exception when supervisor is cancelled cleanly
+        # Expected exception when supervisor is
         pass
     except Exception as e:
         logger.error(f"💥 Fatal error during application run: {e}", exc_info=True)
