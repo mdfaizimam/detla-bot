@@ -1,5 +1,5 @@
 # --- feature_engine.py ---
-# Complete Updated File (Fixed Sequence Logic & Resubscribe Trigger)
+# Complete Updated File (Final Fix for L2 Startup Instability)
 
 import asyncio
 import json
@@ -34,7 +34,8 @@ TFI_LOOKBACK_SECONDS = 5
 TRADE_LOG_TTL_SECONDS = 60 
 CANDLE_HISTORY_SIZE = 100 
 
-CANDLE_RESOLUTIONS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "30d"]
+# 💥 FIX: Removed "30d" from CANDLE_RESOLUTIONS
+CANDLE_RESOLUTIONS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 RESOLUTION_SECONDS = {
     "1m": 60, 
     "5m": 300, 
@@ -43,7 +44,6 @@ RESOLUTION_SECONDS = {
     "4h": 14400, 
     "1d": 86400,
     "1w": 604800,
-    "30d": 2592000 
 }
 
 
@@ -103,7 +103,7 @@ class FeatureEngine:
                 "tas": {}, 
                 "timestamp": 0,
                 "PWH": None, "PWL": None,
-                "PMH": None, "PML": None,
+                "PMH": None, "PML": None, 
             }
             log.info(f"Initialized new feature set for {symbol}")
             
@@ -159,6 +159,9 @@ class FeatureEngine:
     async def _prime_candle_history(self):
         """
         Fetches historical candle data from the REST API to seed the engine.
+        
+        FIX: Uses a large lookback for low-frequency candles (1d, 1w) to ensure enough 
+        data is fetched for TA.
         """
         log.info("Priming candle history for all symbols...")
         end_time = int(time.time())
@@ -169,8 +172,17 @@ class FeatureEngine:
                 try:
                     duration = RESOLUTION_SECONDS[res]
                     limit = CANDLE_HISTORY_SIZE + 50 
-                    # Request slightly more time to account for market closure/gaps
-                    start_time = end_time - (limit * duration * 1.5) 
+                    
+                    # 💥 FIX: Logic to calculate start_time based on resolution frequency
+                    if res in ["1d", "1w"]:
+                        # For Daily and Weekly, request 2 years of history 
+                        two_years_in_seconds = 3600 * 24 * 365 * 2
+                        start_time = end_time - two_years_in_seconds
+                        limit = 2000 # Use max API limit to get max data for low-freq TAs
+                    else:
+                        # For sub-day resolutions, use the smaller, fixed candle count window
+                        start_time = end_time - (limit * duration * 1.5) 
+                        limit = min(2000, limit)
                     
                     path = "/v2/history/candles" 
                     params = {
@@ -178,12 +190,11 @@ class FeatureEngine:
                         "resolution": res,
                         "start": str(start_time), 
                         "end": str(end_time),
-                        # Max API limit is 2000, but we request up to the limit 
-                        "limit": str(min(2000, limit)) 
+                        "limit": str(limit) 
                     }
                     url = f"{DELTA_BASE_URL}{path}"
                     
-                    log.debug(f"Fetching history: {symbol} {res}...")
+                    log.debug(f"Fetching history: {symbol} {res} (Limit: {limit})...")
                     async with self.session.get(url, params=params, headers={'User-Agent': USER_AGENT}) as resp:
                         if resp.status == 200:
                             data = await resp.json()
@@ -286,20 +297,19 @@ class FeatureEngine:
         new_seq_no = data.get("sequence_no", -1)
         received_cs = data.get("cs", -1)
         
-        # --- FIX #1: Handle pre-snapshot updates by immediately triggering a resubscribe ---
+        # 💥 CRITICAL FIX: Stop the Resubscription Loop
+        # If we are waiting for a snapshot (-1), and receive an update, we discard it silently.
+        # This prevents the client from panicking and sending continuous RESUBSCRIBE_L2 commands.
         if self.sequence_numbers[symbol] == -1:
             log.warning(f"⚠️ Skipping L2 update (Seq {new_seq_no}) for {symbol}. Waiting for snapshot to establish sequence.")
-            
-            # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
-            asyncio.create_task(self._publish_resubscribe_request(symbol))
-            return
+            return # <-- REMOVED asyncio.create_task(self._publish_resubscribe_request(symbol))
         # ---------------------------------------------------------------------------------
 
-        # 1. Check sequence number continuity
+        # 1. Check sequence number continuity (Only done AFTER a snapshot is received)
         expected_seq_no = self.sequence_numbers[symbol] + 1
         if new_seq_no != expected_seq_no:
             log.error(f"❌ SEQUENCE MISMATCH for {symbol}! Expected {expected_seq_no}, Got {new_seq_no}. Requires resubscribe.")
-            # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
+            # This is a real data break, so we correctly trigger a resubscribe here
             asyncio.create_task(self._publish_resubscribe_request(symbol)) 
             return 
             
@@ -318,7 +328,7 @@ class FeatureEngine:
         # 3. Validate Checksum (must be done AFTER applying the update)
         if received_cs != -1:
             if not self._validate_checksum(symbol, received_cs):
-                 # CRITICAL FIX: Schedule the coroutine to publish the resubscribe request.
+                 # This is a real data corruption, so we correctly trigger a resubscribe here
                  asyncio.create_task(self._publish_resubscribe_request(symbol))
                  return
 
@@ -490,6 +500,7 @@ class FeatureEngine:
         tas = {} 
         
         for timeframe, candle_deque in self.candle_history[symbol].items():
+            # NOTE: We skip TA if there isn't enough data (addresses the original log error)
             min_candles = max(50, VOLUME_SMA_PERIOD + 2) 
             if len(candle_deque) < min_candles: 
                 log.debug(f"Skipping TA for {symbol} {timeframe}, not enough data ({len(candle_deque)} candles)")
@@ -564,15 +575,12 @@ class FeatureEngine:
                 tas[timeframe] = latest_tas
                 log.debug(f"Calculated TA for {symbol} {timeframe}")
                 
-                # --- Weekly/Monthly S/R Calculation ---
+                # --- Weekly S/R Calculation ---
                 if len(candle_deque) > 1:
                     prev_candle = candle_deque[-2]
                     if timeframe == "1w":
                         self.features[symbol]["PWH"] = prev_candle["high"]
                         self.features[symbol]["PWL"] = prev_candle["low"]
-                    elif timeframe == "30d": 
-                        self.features[symbol]["PMH"] = prev_candle["high"]
-                        self.features[symbol]["PML"] = prev_candle["low"]
 
             except Exception as e:
                 log.error(f"Error calculating TA for {symbol} {timeframe}: {e}", exc_info=True)
