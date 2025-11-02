@@ -1,5 +1,5 @@
 # --- executor.py ---
-# Complete Updated File (With Precision Fix, Deadman Switch, and Network Retry)
+# Complete Updated File (With Persistence, Network Retry, and Stale Lock Cleanup)
 
 import aiohttp
 import asyncio
@@ -21,7 +21,6 @@ from config import (
     config,
     USER_AGENT,
     TRADING_SYMBOLS,
-    # ASSUMPTION: DMS_ID is now configured
     DMS_ID 
 )
 from utils.signing import generate_server_synced_signature
@@ -39,12 +38,12 @@ class OrderExecutionManager:
     MAX_RETRIES = 3 
     RETRY_DELAY = 1.0
 
-    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession):
+    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, risk_manager: RiskManager):
         self.session = http_session 
         self.redis = redis_client   
         self._process_lock = asyncio.Lock()
         
-        self.risk_manager = RiskManager() 
+        self.risk_manager = risk_manager # Use passed-in instance
         self.min_confidence = 0.0 
         
         self.api_key = API_KEY
@@ -174,9 +173,12 @@ class OrderExecutionManager:
             logger.error("❌ Could not fetch any product IDs. Reconciliation failed.")
             return
 
+        is_any_position_found = False
+
         for symbol, product_id in product_id_map.items():
             position = await self._get_position_by_id(product_id)
             if position and float(position.get("size", 0)) != 0:
+                is_any_position_found = True
                 size = float(position.get("size", 0))
                 logger.warning(f"⚠️ Found pre-existing open position for {symbol} (Size: {size}, ID: {product_id}).")
                 
@@ -191,6 +193,13 @@ class OrderExecutionManager:
                     return
             
             await asyncio.sleep(0.2) 
+        
+        # ✅ FIX: If no position was found on the exchange, check and clear a stale Redis lock.
+        if not is_any_position_found:
+             lock_status = await self.redis.get(self.REDIS_POSITION_LOCK_KEY)
+             if lock_status:
+                 logger.warning("🧹 Found stale Redis position lock, but no active position on exchange. Clearing lock.")
+                 await self._release_position_lock()
         
         logger.info("✅ No pre-existing positions found. Ready for new signals.")
 
@@ -211,7 +220,7 @@ class OrderExecutionManager:
         final_tp_price = round(tp_price, precision)
         final_sl_price = round(sl_price, precision)
         
-        # Format numbers as strings for full precision to the API
+        # Format numbers as strings for full precision to the API 
         final_tp_price_str = f"{final_tp_price:.{precision}f}"
         final_sl_price_str = f"{final_sl_price:.{precision}f}"
 
@@ -353,7 +362,8 @@ class OrderExecutionManager:
             return
 
         side = "buy" if direction == "LONG" else "sell"
-        size_hint = float(config.get("BASE_POSITION_SIZE", 1))
+        # Use size from signal, which in this case should be static BASE_POSITION_SIZE
+        size_hint = float(signal.get("size_hint", config.get("BASE_POSITION_SIZE", 1)))
         tp_price = signal.get("tp_price")
         sl_price = signal.get("sl_price")
 
@@ -401,8 +411,9 @@ class OrderExecutionManager:
             pnl = msg.get("pnl", 0.0) 
             if pnl != 0.0:
                 new_equity = self.risk_manager.current_equity + pnl 
-                self.risk_manager.update_equity(new_equity)
-                logger.info(f"Equity updated to: {new_equity} (PnL: {pnl})")
+                # ✅ UPDATED: Call async update_equity on risk_manager
+                await self.risk_manager.update_equity(new_equity)
+                logger.info(f"Equity updated to: {self.risk_manager.current_equity} (PnL: {pnl})")
                 
         elif msg.get("type") == "start_monitoring":
             logger.info(f"Monitor confirmed tracking for {msg.get('symbol')}")
@@ -434,7 +445,8 @@ class OrderExecutionManager:
                     if channel == SIGNAL_CHANNEL:
                         asyncio.create_task(self._process_signal(data))
                     elif channel == MONITORING_CHANNEL:
-                        asyncio.create_task(self._handle_monitor_update(data))
+                        # Ensure handle monitor update is awaited as it now has async calls
+                        asyncio.create_task(self._handle_monitor_update(data)) 
                         
                 except Exception as e:
                     logger.error(f"Error processing message from {channel}: {e}")
