@@ -1,5 +1,5 @@
 # --- config.py ---
-# Complete Updated File (with Spot Index Symbols and Control Channel)
+# Complete Updated File (with Dynamic TSL Parameters)
 
 import os
 from pathlib import Path
@@ -23,14 +23,11 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # ----------------------------------------------------------------------
 # ✅ Deadman Switch Configuration 
 # ----------------------------------------------------------------------
-# IMPORTANT: This must be a unique string identifier for your bot/instance.
-# Ensure this is set in your .env file or manually set a unique value here.
 DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
 
 # ----------------------------------------------------------------------
 # ✅ Spot Index Symbols (For v2/spot_price WS subscription)
 # ----------------------------------------------------------------------
-# BTCUSD uses .DEXBTUSD, others follow .DE<Underlying><Quoting>
 SPOT_INDEX_SYMBOLS = {
     "BTCUSD": ".DEXBTUSD",
     "ETHUSD": ".DEETHUSD", 
@@ -65,12 +62,15 @@ TP_BUFFER_PCT = 0.001
 MIN_RISK_REWARD_RATIO = 1.5 
 
 # ----------------------------------------------------------------------
-# ✅ Trailing Stop Loss (TSL) Parameters
+# ✅ Trailing Stop Loss (TSL) Parameters (DYNAMIC UPDATE)
 # ----------------------------------------------------------------------
 TSL_ENABLED = True
-TSL_TRAIL_AMOUNT = 2.00    # The fixed distance in USD (e.g., $2.00)
+TSL_TRAIL_AMOUNT = 2.00    # Static fallback/Original config (used as fallback)
 TSL_CHECK_INTERVAL = 5     # Poll frequency in seconds
-TSL_CHANNEL = "delta:tsl_control" # Channel for starting/stopping TSL
+TSL_CHANNEL = "delta:tsl_control" 
+
+TSL_ATR_MULTIPLIER = 1.0     # NEW: Multiplier applied to ATR for dynamic trail distance
+TSL_MIN_TRAIL_AMOUNT = 0.5   # NEW: Minimum dollar value trail floor
 
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Parameters (Entry Signal)
@@ -128,8 +128,10 @@ SIGNAL_CHANNEL = "delta:signals"
 EXECUTION_CHANNEL = "delta:executions"
 ERROR_CHANNEL = "delta:errors"
 MONITORING_CHANNEL = "delta:monitoring"
-CONTROL_CHANNEL = "delta:control"
-TSL_CHANNEL = "delta:tsl_control" # NEW
+CONTROL_CHANNEL = "delta:control" 
+TSL_CHANNEL = "delta:tsl_control" 
+
+LATEST_ENRICHED_KEY = "latest:enriched:" # NEW: Redis Key Prefix for caching FE output
 
 REDIS_DATA_TTL = 3600
 CACHE_EXPIRY = 300
@@ -159,11 +161,13 @@ config = {
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
     
-    # TSL
+    # TSL (Dynamic & Static)
     "TSL_ENABLED": TSL_ENABLED,
-    "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT,
+    "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT, 
     "TSL_CHECK_INTERVAL": TSL_CHECK_INTERVAL,
     "TSL_CHANNEL": TSL_CHANNEL,
+    "TSL_ATR_MULTIPLIER": TSL_ATR_MULTIPLIER, 
+    "TSL_MIN_TRAIL_AMOUNT": TSL_MIN_TRAIL_AMOUNT, 
 
     # Heuristic Params
     "OBI_THRESHOLD": OBI_THRESHOLD,
@@ -203,4 +207,4 @@ print(f"🌊 Volume: {VOLUME_CHECK_ENABLED} ({VOLUME_TIMEFRAME} vol > {VOLUME_SU
 print(f"⛰️ S/R: {SNR_CHECK_ENABLED} (Avoid {SNR_PROXIMITY_PCT * 100}% proximity to Daily/Weekly/Monthly levels)")
 print(f"⚖️ R/R: Required Ratio > {MIN_RISK_REWARD_RATIO}:1")
 print(f"🎛️ Single Position Mode: Active (Max {MAX_CONCURRENT_TRADES} concurrent trade)")
-print(f"🔀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_TRAIL_AMOUNT} USD)")
+print(f"🔀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_ATR_MULTIPLIER}x ATR, Min: {TSL_MIN_TRAIL_AMOUNT} USD)")

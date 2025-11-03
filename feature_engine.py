@@ -1,5 +1,5 @@
 # --- feature_engine.py ---
-# Complete Updated File (Final Fix for L2 Startup Instability)
+# Complete Updated File (Caching Enriched Data for Dynamic TSL)
 
 import asyncio
 import json
@@ -24,7 +24,8 @@ from config import (
     VOLUME_SMA_PERIOD,
     ATR_TIMEFRAME,
     SPOT_INDEX_SYMBOLS,
-    CONTROL_CHANNEL 
+    CONTROL_CHANNEL,
+    LATEST_ENRICHED_KEY # IMPORTED FOR CACHE KEY
 ) 
 
 log = logging.getLogger("feature_engine")
@@ -298,18 +299,15 @@ class FeatureEngine:
         received_cs = data.get("cs", -1)
         
         # 💥 CRITICAL FIX: Stop the Resubscription Loop
-        # If we are waiting for a snapshot (-1), and receive an update, we discard it silently.
-        # This prevents the client from panicking and sending continuous RESUBSCRIBE_L2 commands.
         if self.sequence_numbers[symbol] == -1:
             log.warning(f"⚠️ Skipping L2 update (Seq {new_seq_no}) for {symbol}. Waiting for snapshot to establish sequence.")
-            return # <-- REMOVED asyncio.create_task(self._publish_resubscribe_request(symbol))
+            return 
         # ---------------------------------------------------------------------------------
 
-        # 1. Check sequence number continuity (Only done AFTER a snapshot is received)
+        # 1. Check sequence number continuity 
         expected_seq_no = self.sequence_numbers[symbol] + 1
         if new_seq_no != expected_seq_no:
             log.error(f"❌ SEQUENCE MISMATCH for {symbol}! Expected {expected_seq_no}, Got {new_seq_no}. Requires resubscribe.")
-            # This is a real data break, so we correctly trigger a resubscribe here
             asyncio.create_task(self._publish_resubscribe_request(symbol)) 
             return 
             
@@ -325,10 +323,9 @@ class FeatureEngine:
             if size == 0: self.order_books[symbol]["asks"].pop(price_str, None)
             else: self.order_books[symbol]["asks"][price_str] = size
 
-        # 3. Validate Checksum (must be done AFTER applying the update)
+        # 3. Validate Checksum
         if received_cs != -1:
             if not self._validate_checksum(symbol, received_cs):
-                 # This is a real data corruption, so we correctly trigger a resubscribe here
                  asyncio.create_task(self._publish_resubscribe_request(symbol))
                  return
 
@@ -452,6 +449,7 @@ class FeatureEngine:
     # ----------------------------------------------------------------------
 
     def _calc_imbalance_and_mid(self, symbol: str):
+        """Calculates Order Book Imbalance (OBI) and Mid Price."""
         book = self.order_books.get(symbol)
         if not book or not book["bids"] or not book["asks"]: return 0.0, None 
         try:
@@ -473,6 +471,7 @@ class FeatureEngine:
             return 0.0, None
             
     def _calculate_tfi(self, symbol: str):
+        """Calculates Trade Flow Index (TFI) over a lookback window."""
         if symbol not in self.trade_logs: return 0.0
         buy_vol = 0.0
         sell_vol = 0.0
@@ -500,7 +499,6 @@ class FeatureEngine:
         tas = {} 
         
         for timeframe, candle_deque in self.candle_history[symbol].items():
-            # NOTE: We skip TA if there isn't enough data (addresses the original log error)
             min_candles = max(50, VOLUME_SMA_PERIOD + 2) 
             if len(candle_deque) < min_candles: 
                 log.debug(f"Skipping TA for {symbol} {timeframe}, not enough data ({len(candle_deque)} candles)")
@@ -589,7 +587,7 @@ class FeatureEngine:
 
 
     async def _publish_features(self, symbol: str, timestamp_us: int):
-        """Calculates all features and publishes the combined payload."""
+        """Calculates all features, caches the payload, and publishes to the channel."""
         if symbol not in self.features:
             self._initialize_state(symbol)
 
@@ -621,6 +619,14 @@ class FeatureEngine:
                 "PMH": self.features[symbol].get("PMH"),
                 "PML": self.features[symbol].get("PML"),
             }
+            
+            # ✅ NEW STEP: Cache the complete enriched payload for other services (like TSL)
+            try:
+                # Cache using the key prefix and symbol, set expiry
+                await self.redis.set(f"{LATEST_ENRICHED_KEY}{symbol}", json.dumps(payload), ex=300) 
+            except Exception as e:
+                log.error(f"❌ Failed to cache enriched event to Redis: {e}")
+            
             await self._publish(payload)
             
     async def start(self):

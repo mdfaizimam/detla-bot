@@ -14,7 +14,7 @@ from ml_strategy import MLForecastingStrategy
 from executor import OrderExecutionManager
 from monitor import PositionMonitor
 from risk_manager import RiskManager
-from trailing_stop_manager import TrailingStopManager # NEW: Import TSL Manager
+from trailing_stop_manager import TrailingStopManager 
 from config import REDIS_URL, config
 
 # --- Systematic Logging Setup (FIXED FOR THREAD-SAFETY) ---

@@ -1,5 +1,5 @@
 # --- executor.py ---
-# Complete Updated File (Market Entry + Standalone Stop Market for TSL)
+# Complete Updated File (DMS Stability Fix)
 
 import aiohttp
 import asyncio
@@ -216,8 +216,7 @@ class OrderExecutionManager:
 
     async def _place_linked_orders(self, symbol: str, side: str, size: float, tp_price: float, sl_price: float) -> Optional[Tuple[int, str]]:
         """
-        Places separate Market (Entry) and Stop Market (SL) orders.
-        TP order placement is omitted as requested.
+        [CRITICAL FIX] Places separate Market (Entry) and Stop Market (SL) orders.
         Returns product_id, direction (e.g., "SHORT") on success.
         """
         
@@ -257,7 +256,7 @@ class OrderExecutionManager:
         final_sl_price = round(sl_price, precision)
         final_sl_price_str = f"{final_sl_price:.{precision}f}"
         
-        # Use market_order type along with stop_price to place a Stop Market order 
+        # Use market_order type along with stop_price to place a Stop Market order
         sl_payload = {
             "product_id": product_id,
             "size": abs(size), 
@@ -272,7 +271,7 @@ class OrderExecutionManager:
         sl_resp = await self._send_order("POST", "/v2/orders", sl_payload)
         
         if not sl_resp.get("success"):
-            logger.error(f"❌ Standalone Stop Market Order failed: {sl_resp}. WARNING: Position is unprotected!")
+            logger.error(f"❌ Standalone Stop Market Order failed: {sl_resp}. WARNING: Position may be unprotected!")
             # TSL Manager will handle the failed tracking and log a warning.
         else:
             logger.info(f"🎯 Stop Loss Order Placed Successfully. ID: {sl_resp.get('result', {}).get('id')}")
@@ -358,12 +357,26 @@ class OrderExecutionManager:
         """Send periodic acknowledgment to keep the switch alive."""
         path = "/v2/heartbeat"
         payload = {"heartbeat_id": self.dms_id, "ttl": ttl_ms}
-        resp = await self._dms_send_request("POST", path, payload)
-        if resp.get("success"):
-            logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
-        else:
-            # FIX: Only log as warning here, the retry loop will have handled the transient error
-            logger.warning(f"⚠️ DMS Acknowledgment failed: {resp}")
+        
+        # ✅ FIX: Use simple retry loop internally for stability
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            resp = await self._dms_send_request("POST", path, payload)
+            if resp.get("success"):
+                logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
+                return True
+            else:
+                # Only log as warning for transient errors, but treat as failure if it's an API error
+                if attempt < self.MAX_RETRIES and 'error' in resp:
+                    logger.warning(f"⚠️ DMS Ack failed (Attempt {attempt}/{self.MAX_RETRIES}): {resp}. Retrying...")
+                    await asyncio.sleep(self.RETRY_DELAY)
+                elif 'error' not in resp:
+                    # Non-API failure (e.g., disconnection caught by _dms_send_request)
+                    return False
+                else:
+                    logger.error(f"❌ DMS Acknowledgment failed persistently after {self.MAX_RETRIES} attempts.")
+                    return False
+        return False
+
 
     async def _dms_loop(self):
         """Starts the continuous DMS acknowledgment loop."""
@@ -375,9 +388,16 @@ class OrderExecutionManager:
         
         while True:
             try:
-                # Send acknowledgment just before the TTL expires (TTL: 30s)
-                await self._dms_send_acknowledgment() 
-                await asyncio.sleep(25) 
+                # Send acknowledgment and handle result
+                success = await self._dms_send_acknowledgment()
+                
+                # If acknowledgment failed, pause execution longer before next attempt
+                if not success:
+                    await asyncio.sleep(self.RETRY_DELAY * 4) # Pause longer if connection is bad
+                else:
+                    # Send acknowledgment just before the TTL expires (TTL: 30s)
+                    await asyncio.sleep(25) 
+                    
             except asyncio.CancelledError:
                 logger.info("DMS loop cancelled.")
                 break
