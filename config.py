@@ -65,6 +65,14 @@ TP_BUFFER_PCT = 0.001
 MIN_RISK_REWARD_RATIO = 1.5 
 
 # ----------------------------------------------------------------------
+# ✅ Trailing Stop Loss (TSL) Parameters
+# ----------------------------------------------------------------------
+TSL_ENABLED = True
+TSL_TRAIL_AMOUNT = 2.00    # The fixed distance in USD (e.g., $2.00)
+TSL_CHECK_INTERVAL = 5     # Poll frequency in seconds
+TSL_CHANNEL = "delta:tsl_control" # Channel for starting/stopping TSL
+
+# ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Parameters (Entry Signal)
 # ----------------------------------------------------------------------
 OBI_THRESHOLD = 0.3  
@@ -120,7 +128,8 @@ SIGNAL_CHANNEL = "delta:signals"
 EXECUTION_CHANNEL = "delta:executions"
 ERROR_CHANNEL = "delta:errors"
 MONITORING_CHANNEL = "delta:monitoring"
-CONTROL_CHANNEL = "delta:control" # <--- NEW CHANNEL ADDED
+CONTROL_CHANNEL = "delta:control"
+TSL_CHANNEL = "delta:tsl_control" # NEW
 
 REDIS_DATA_TTL = 3600
 CACHE_EXPIRY = 300
@@ -150,6 +159,12 @@ config = {
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
     
+    # TSL
+    "TSL_ENABLED": TSL_ENABLED,
+    "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT,
+    "TSL_CHECK_INTERVAL": TSL_CHECK_INTERVAL,
+    "TSL_CHANNEL": TSL_CHANNEL,
+
     # Heuristic Params
     "OBI_THRESHOLD": OBI_THRESHOLD,
     "TFI_THRESHOLD": TFI_THRESHOLD,
@@ -188,3 +203,4 @@ print(f"🌊 Volume: {VOLUME_CHECK_ENABLED} ({VOLUME_TIMEFRAME} vol > {VOLUME_SU
 print(f"⛰️ S/R: {SNR_CHECK_ENABLED} (Avoid {SNR_PROXIMITY_PCT * 100}% proximity to Daily/Weekly/Monthly levels)")
 print(f"⚖️ R/R: Required Ratio > {MIN_RISK_REWARD_RATIO}:1")
 print(f"🎛️ Single Position Mode: Active (Max {MAX_CONCURRENT_TRADES} concurrent trade)")
+print(f"🔀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_TRAIL_AMOUNT} USD)")

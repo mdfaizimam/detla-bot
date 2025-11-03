@@ -1,5 +1,5 @@
 # --- executor.py ---
-# Complete Updated File (With Persistence, Network Retry, and Stale Lock Cleanup)
+# Complete Updated File (Market Entry + Standalone Stop Market for TSL)
 
 import aiohttp
 import asyncio
@@ -10,7 +10,7 @@ import urllib.parse
 # FIX: Import client exceptions for error handling
 from aiohttp import client_exceptions
 from redis import asyncio as aioredis
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Tuple
 
 from config import (
     DELTA_BASE_URL,
@@ -21,7 +21,9 @@ from config import (
     config,
     USER_AGENT,
     TRADING_SYMBOLS,
-    DMS_ID 
+    DMS_ID,
+    TSL_CHANNEL, 
+    TSL_ENABLED 
 )
 from utils.signing import generate_server_synced_signature
 from risk_manager import RiskManager 
@@ -180,13 +182,21 @@ class OrderExecutionManager:
             if position and float(position.get("size", 0)) != 0:
                 is_any_position_found = True
                 size = float(position.get("size", 0))
+                direction = "LONG" if size > 0 else "SHORT"
+                entry_price = float(position.get("entry_price", 0.0))
                 logger.warning(f"⚠️ Found pre-existing open position for {symbol} (Size: {size}, ID: {product_id}).")
                 
                 lock_acquired = await self._acquire_position_lock(symbol)
                 
                 if lock_acquired:
                     await self._notify_monitor(symbol, size, product_id)
-                    logger.info(f"🔒 Lock acquired. Monitor is now tracking existing {symbol} position.")
+                    # ✅ TSL INTEGRATION: Start TSL for reconciled position
+                    if TSL_ENABLED:
+                        # Note: Using entry_price as the best price seen so far to initialize TSL tracking.
+                        await self._notify_tsl_manager(symbol, direction, size, product_id, entry_price) 
+                        logger.info(f"🔒 Lock acquired. TSL and Monitor are now tracking existing {symbol} position.")
+                    else:
+                        logger.info(f"🔒 Lock acquired. Monitor is now tracking existing {symbol} position.")
                     return
                 else:
                     logger.error(f"❌ Found existing position for {symbol}, but FAILED to acquire lock.")
@@ -204,9 +214,12 @@ class OrderExecutionManager:
         logger.info("✅ No pre-existing positions found. Ready for new signals.")
 
 
-    # UPDATED: Implements tick_size precision logic - CRITICAL FIX
-    async def _place_bracket_order(self, symbol: str, side: str, size: float, tp_price: float, sl_price: float):
-        """Places the bracket order with correct tick size precision. Returns product_id on success, None on failure."""
+    async def _place_linked_orders(self, symbol: str, side: str, size: float, tp_price: float, sl_price: float) -> Optional[Tuple[int, str]]:
+        """
+        Places separate Market (Entry) and Stop Market (SL) orders.
+        TP order placement is omitted as requested.
+        Returns product_id, direction (e.g., "SHORT") on success.
+        """
         
         product_info = await self._get_product_info(symbol) 
         if not product_info:
@@ -215,47 +228,68 @@ class OrderExecutionManager:
         
         product_id = product_info["id"]
         precision = product_info["precision"]
+        direction = "LONG" if side == "buy" else "SHORT"
         
-        # CRITICAL FIX: Round price to the required tick size precision
-        final_tp_price = round(tp_price, precision)
-        final_sl_price = round(sl_price, precision)
-        
-        # Format numbers as strings for full precision to the API 
-        final_tp_price_str = f"{final_tp_price:.{precision}f}"
-        final_sl_price_str = f"{final_sl_price:.{precision}f}"
-
-        logger.info("📊 [%s] Placing order: Side=%s, Size=%.2f | TP=%s | SL=%s (Precision: %d)", 
-                    symbol, side, size, final_tp_price_str, final_sl_price_str, precision)
-
-        trigger_method = config.get("BRACKET_STOP_TRIGGER", "last_traded_price")
-
-        combined_payload = {
+        # --- 1. Place Market Entry Order ---
+        entry_payload = {
             "product_id": product_id,
-            "size": size,
+            "size": abs(size),
             "side": side,
             "order_type": "market_order",
-            "bracket_stop_trigger_method": trigger_method,
-            "bracket_take_profit_price": final_tp_price_str,
-            "bracket_take_profit_limit_price": final_tp_price_str, 
-            "bracket_stop_loss_price": final_sl_price_str
         }
+        
+        logger.info(f"📦 Placing Market Entry Order: {entry_payload}")
+        entry_resp = await self._send_order("POST", "/v2/orders", entry_payload) 
 
-        logger.info(f"📦 Placing native bracket order: {combined_payload}")
-        # Use generic sender for POST /v2/orders
-        order_resp = await self._send_order("POST", "/v2/orders", combined_payload) 
-
-        if not order_resp.get("success"):
-            logger.error("❌ Native bracket order failed: %s", order_resp)
+        if not entry_resp.get("success"):
+            logger.error(f"❌ Market Entry Order failed: {entry_resp}")
             return None 
 
-        order_id = order_resp.get("result", {}).get("id")
-        logger.info(f"🎯 Native Bracket Order Placed Successfully. Entry Order ID: {order_id}")
-        return product_id 
+        logger.info(f"🎯 Entry Order Placed Successfully. ID: {entry_resp.get('result', {}).get('id')}")
+
+        
+        # --- 2. Place Stop Loss (SL) Order (Standalone Stop Market) ---
+        
+        # SL order must be the opposite side of the entry order
+        sl_side = "sell" if side == "buy" else "buy"
+        
+        # Round price to the required tick size precision
+        final_sl_price = round(sl_price, precision)
+        final_sl_price_str = f"{final_sl_price:.{precision}f}"
+        
+        # Use market_order type along with stop_price to place a Stop Market order 
+        sl_payload = {
+            "product_id": product_id,
+            "size": abs(size), 
+            "side": sl_side,
+            "order_type": "market_order", 
+            "stop_price": final_sl_price_str,
+            "reduce_only": True,
+            "stop_order_type": "stop_loss_order" 
+        }
+        
+        logger.info(f"📦 Placing Standalone Stop Market Order (SL): {sl_payload}")
+        sl_resp = await self._send_order("POST", "/v2/orders", sl_payload)
+        
+        if not sl_resp.get("success"):
+            logger.error(f"❌ Standalone Stop Market Order failed: {sl_resp}. WARNING: Position is unprotected!")
+            # TSL Manager will handle the failed tracking and log a warning.
+        else:
+            logger.info(f"🎯 Stop Loss Order Placed Successfully. ID: {sl_resp.get('result', {}).get('id')}")
+        
+        # --- 3. Take Profit (TP) Order OMITTED as requested. ---
+        
+        # The position is now successfully established, and the SL (Stop Market) is placed
+        return product_id, direction 
+    
+    # Alias the new function as the placement function for simplicity
+    _place_bracket_order = _place_linked_orders 
 
     # UPDATED: Generic signed request sender for DMS and Orders with retry logic
     async def _dms_send_request(self, method: str, path: str, payload: Optional[dict] = None) -> dict:
         """Sends a signed authenticated request with retry logic for network errors."""
-        body = json.dumps(payload) if payload else ""
+        # Body needs to be sorted and compact for signature generation
+        body = json.dumps(payload, separators=(',', ':'), sort_keys=True) if payload else ""
         
         # Note: Query parameters are generally omitted for POST/PUT/DELETE
         signature, timestamp = await generate_server_synced_signature(method, path, body, "") 
@@ -273,6 +307,7 @@ class OrderExecutionManager:
         # FIX: Implement retry loop for transient network errors
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
+                # Use data=body to send the raw, signed JSON string
                 async with self.session.request(method, url, data=body, headers=headers) as resp:
                     try:
                         response_json = await resp.json()
@@ -365,7 +400,7 @@ class OrderExecutionManager:
         # Use size from signal, which in this case should be static BASE_POSITION_SIZE
         size_hint = float(signal.get("size_hint", config.get("BASE_POSITION_SIZE", 1)))
         tp_price = signal.get("tp_price")
-        sl_price = signal.get("sl_price")
+        sl_price = signal.get("sl_price") # Initial SL for the bracket order
 
         if not all([symbol, direction, size_hint, tp_price, sl_price]):
              logger.error(f"Invalid signal received, missing key fields: {signal}")
@@ -377,11 +412,20 @@ class OrderExecutionManager:
             return
 
         try:
-            product_id = await self._place_bracket_order(symbol, side, size_hint, tp_price, sl_price)
+            # Using the manually linked order placement function
+            result = await self._place_linked_orders(symbol, side, size_hint, tp_price, sl_price)
             
-            if product_id:
+            if result:
+                product_id, trade_direction = result
+                
+                # Trade successfully placed. Notify monitor and TSL manager.
                 await self._notify_monitor(symbol, size_hint, product_id)
-                logger.info("✅ Trade executed for %s [%s]", symbol, direction)
+                
+                if TSL_ENABLED:
+                    # Pass trade direction and the initial SL price (as a base for TSL)
+                    await self._notify_tsl_manager(symbol, trade_direction, size_hint, product_id, sl_price)
+                    
+                logger.info("✅ Trade executed for %s [%s]. TSL Manager notified.", symbol, direction)
             else:
                 logger.error("❌ Trade failed for %s [%s], releasing lock.", symbol, direction)
                 await self._release_position_lock()
@@ -389,6 +433,21 @@ class OrderExecutionManager:
         except Exception as e:
             logger.error(f"❌ Error executing trade for {symbol}: {e}", exc_info=True)
             await self._release_position_lock()
+            
+    # NEW: Notify TSL Manager function
+    async def _notify_tsl_manager(self, symbol: str, direction: str, size: float, product_id: int, entry_price: float):
+        """Notify the TSL Manager to start trailing the stop loss for a new position."""
+        msg = {
+            "type": "start_tsl",
+            "symbol": symbol,
+            "direction": direction,
+            "size": size,
+            "product_id": product_id,
+            "entry_price": entry_price, # Initial SL price used here as a safer proxy for the TSL state
+            "timestamp": time.time(),
+        }
+        await self.redis.publish(TSL_CHANNEL, json.dumps(msg))
+        logger.info(f"📢 Notified TSL Manager to start tracking {symbol} (ID: {product_id})")
 
     async def _notify_monitor(self, symbol: str, size: float, product_id: int):
         msg = {
