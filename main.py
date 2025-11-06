@@ -1,4 +1,6 @@
 # --- main.py ---
+# UPDATED: To instantiate and inject the new DeltaAPIClient
+
 import asyncio
 import signal
 import logging
@@ -15,7 +17,10 @@ from executor import OrderExecutionManager
 from monitor import PositionMonitor
 from risk_manager import RiskManager
 from trailing_stop_manager import TrailingStopManager 
-from config import REDIS_URL, config
+
+# NEW: Import the centralized API client
+from utils.api_client import DeltaAPIClient
+from config import REDIS_URL, config, API_KEY, API_SECRET
 
 # --- Systematic Logging Setup (FIXED FOR THREAD-SAFETY) ---
 
@@ -34,7 +39,7 @@ log_formatter = logging.Formatter(
 )
 
 # 4. Create the target handlers (used by the listener)
-console_level = config.get("LOG_LEVEL", logging.INFO)
+console_level = config.get("LOG_LEVEL", "INFO")
 console_handler = logging.StreamHandler()
 console_handler.setLevel(console_level)
 console_handler.setFormatter(log_formatter)
@@ -82,7 +87,11 @@ async def run_bot():
         http_session = aiohttp.ClientSession()
         logger.info("🔗 HTTP ClientSession created")
 
-        # --- Component Initialization and Startup ---
+        # --- NEW: Instantiate Centralized API Client ---
+        api_client = DeltaAPIClient(http_session, API_KEY, API_SECRET)
+        logger.info("🔐 Centralized DeltaAPIClient created")
+
+        # --- Component Initialization and Startup (UPDATED) ---
         ws_manager = WebSocketManager(redis_client, http_session)
         feature_engine = FeatureEngine(redis_client, http_session) 
         
@@ -90,9 +99,15 @@ async def run_bot():
         await risk_manager._load_state_from_redis()
 
         strategy = MLForecastingStrategy(redis_client) 
-        executor = OrderExecutionManager(redis_client, http_session, risk_manager)
-        position_monitor = PositionMonitor(redis_client, http_session)
-        tsl_manager = TrailingStopManager(redis_client, http_session) # NEW: Instantiate TSL Manager
+        
+        # UPDATED: Inject api_client
+        executor = OrderExecutionManager(redis_client, api_client, risk_manager)
+        
+        # UPDATED: Inject api_client
+        position_monitor = PositionMonitor(redis_client, api_client)
+        
+        # UPDATED: Inject both session (for unauth) and api_client (for auth)
+        tsl_manager = TrailingStopManager(redis_client, http_session, api_client) 
 
         # Start all services concurrently
         tasks = [

@@ -1,5 +1,6 @@
 # --- executor.py ---
-# Complete Updated File (DMS Stability Fix)
+# UPDATED: To use centralized DeltaAPIClient
+# FIX: Passes correct trigger_price (not sl_price) to TSL Manager
 
 import aiohttp
 import asyncio
@@ -7,8 +8,6 @@ import json
 import logging
 import time
 import urllib.parse
-# FIX: Import client exceptions for error handling
-from aiohttp import client_exceptions
 from redis import asyncio as aioredis
 from typing import Optional, Any, Dict, Tuple
 
@@ -25,35 +24,31 @@ from config import (
     TSL_CHANNEL, 
     TSL_ENABLED 
 )
-from utils.signing import generate_server_synced_signature
+from utils.api_client import DeltaAPIClient
 from risk_manager import RiskManager 
 
 logger = logging.getLogger("executor")
-logger.setLevel(logging.INFO)
 
 
 class OrderExecutionManager:
     REDIS_POSITION_LOCK_KEY = "active_position" 
     REDIS_POSITION_LOCK_TTL = 60
     
-    # FIX: Add retry constants for transient network errors
-    MAX_RETRIES = 3 
-    RETRY_DELAY = 1.0
-
-    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, risk_manager: RiskManager):
-        self.session = http_session 
+    def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
+        self.session = api_client.session # For unauthenticated calls
+        self.api_client = api_client       # For authenticated calls
         self.redis = redis_client   
         self._process_lock = asyncio.Lock()
         
-        self.risk_manager = risk_manager # Use passed-in instance
+        self.risk_manager = risk_manager 
         self.min_confidence = 0.0 
         
         self.api_key = API_KEY
         self.api_secret = API_SECRET
-        self.dms_id = DMS_ID # Use the DMS ID from config
-        self.product_info_cache = {} # NEW: Cache for product info/tick size
+        self.dms_id = DMS_ID
+        self.product_info_cache = {}
         
-        logger.info("✅ OrderExecutionManager initialized.")
+        logger.info("✅ OrderExecutionManager initialized (using DeltaAPIClient).")
 
     async def close(self):
         logger.info("🔒 Executor connections closed by main.")
@@ -83,17 +78,16 @@ class OrderExecutionManager:
         except Exception as e:
             logger.error("❌ Error releasing lock: %s", e)
 
-    # NEW: Fetches and caches product details including ID and tick_size/precision.
     async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Fetches product details including tick_size/precision and caches them."""
         if symbol in self.product_info_cache:
             return self.product_info_cache[symbol]
 
-        # Use the dedicated endpoint GET /v2/products/{symbol}
         path = f"/v2/products/{symbol}" 
         url = f"{DELTA_BASE_URL}{path}"
         
         try:
+            # Use the shared unauthenticated session
             async with self.session.get(url, headers={'User-Agent': USER_AGENT}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -135,26 +129,16 @@ class OrderExecutionManager:
         try:
             path = "/v2/positions"
             params = {"product_id": product_id} 
-            query_string = urllib.parse.urlencode(params)
-            
-            signature, timestamp = await generate_server_synced_signature("GET", path, "", query_string)
-            headers = {
-                "api-key": self.api_key,
-                "timestamp": str(timestamp),
-                "signature": signature,
-                "Content-Type": "application/json",
-                "User-Agent": USER_AGENT
-            }
-            url = f"{DELTA_BASE_URL}{path}"
             logger.debug(f"🔍 Fetching position for product_id: {product_id}")
 
-            async with self.session.get(url, headers=headers, params=params) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("result", {})
-                else:
-                    logger.error(f"❌ Failed to fetch position {product_id}. HTTP Status: {resp.status}")
-                    return None
+            # UPDATED: Use the centralized API client
+            status, data = await self.api_client.get(path, params=params)
+
+            if status == 200:
+                return data.get("result", {})
+            else:
+                logger.error(f"❌ Failed to fetch position {product_id}. HTTP Status: {status}")
+                return None
         except Exception as e:
             logger.error(f"❌ Error fetching position {product_id}: {e}")
             return None 
@@ -192,7 +176,7 @@ class OrderExecutionManager:
                     await self._notify_monitor(symbol, size, product_id)
                     # ✅ TSL INTEGRATION: Start TSL for reconciled position
                     if TSL_ENABLED:
-                        # Note: Using entry_price as the best price seen so far to initialize TSL tracking.
+                        # ⭐️ FIX: Pass entry_price, not sl_price (which we don't have here)
                         await self._notify_tsl_manager(symbol, direction, size, product_id, entry_price) 
                         logger.info(f"🔒 Lock acquired. TSL and Monitor are now tracking existing {symbol} position.")
                     else:
@@ -238,6 +222,7 @@ class OrderExecutionManager:
         }
         
         logger.info(f"📦 Placing Market Entry Order: {entry_payload}")
+        # UPDATED: Use api_client.post
         entry_resp = await self._send_order("POST", "/v2/orders", entry_payload) 
 
         if not entry_resp.get("success"):
@@ -268,6 +253,7 @@ class OrderExecutionManager:
         }
         
         logger.info(f"📦 Placing Standalone Stop Market Order (SL): {sl_payload}")
+        # UPDATED: Use api_client.post
         sl_resp = await self._send_order("POST", "/v2/orders", sl_payload)
         
         if not sl_resp.get("success"):
@@ -284,57 +270,18 @@ class OrderExecutionManager:
     # Alias the new function as the placement function for simplicity
     _place_bracket_order = _place_linked_orders 
 
-    # UPDATED: Generic signed request sender for DMS and Orders with retry logic
-    async def _dms_send_request(self, method: str, path: str, payload: Optional[dict] = None) -> dict:
-        """Sends a signed authenticated request with retry logic for network errors."""
-        # Body needs to be sorted and compact for signature generation
-        body = json.dumps(payload, separators=(',', ':'), sort_keys=True) if payload else ""
-        
-        # Note: Query parameters are generally omitted for POST/PUT/DELETE
-        signature, timestamp = await generate_server_synced_signature(method, path, body, "") 
-        
-        headers = {
-            "api-key": self.api_key,
-            "timestamp": str(timestamp),
-            "signature": signature,
-            "Content-Type": "application/json",
-            "User-Agent": USER_AGENT
-        }
-        
-        url = f"{DELTA_BASE_URL}{path}"
-        
-        # FIX: Implement retry loop for transient network errors
-        for attempt in range(1, self.MAX_RETRIES + 1):
-            try:
-                # Use data=body to send the raw, signed JSON string
-                async with self.session.request(method, url, data=body, headers=headers) as resp:
-                    try:
-                        response_json = await resp.json()
-                        return response_json
-                    except Exception as e:
-                        # Log and treat as a failure if decoding fails but HTTP succeeded (rare)
-                        logger.error(f"Failed to decode API response for {path}: {e}")
-                        return {"success": False, "error": f"HTTP {resp.status} - Decode Failed"}
-            
-            # Catch transient network errors for retries
-            except (client_exceptions.ServerDisconnectedError, asyncio.TimeoutError) as e:
-                if attempt < self.MAX_RETRIES:
-                    logger.warning(f"Server connection error on {path} (Attempt {attempt}/{self.MAX_RETRIES}). Retrying in {self.RETRY_DELAY:.1f}s... Error: {type(e).__name__}")
-                    await asyncio.sleep(self.RETRY_DELAY)
-                else:
-                    logger.error(f"❌ API request to {path} failed after {self.MAX_RETRIES} attempts. Error: {type(e).__name__}", exc_info=True)
-                    return {"success": False, "error": str(e)}
-            
-            # Catch all other exceptions (e.g., DNS error, other non-retriable exceptions)
-            except Exception as e:
-                logger.error(f"❌ Unhandled error sending request to {path} on attempt {attempt}: {e}", exc_info=True)
-                return {"success": False, "error": str(e)}
-
-        return {"success": False, "error": "Max retries exceeded"}
-
-    # Updated _send_order to use _dms_send_request internally
+    # Updated _send_order to use api_client internally
     async def _send_order(self, method: str, path: str, payload: dict) -> dict:
-        return await self._dms_send_request(method, path, payload)
+        """Helper to map order sending to the new api_client."""
+        if method.upper() == "POST":
+            status, response = await self.api_client.post(path, payload=payload)
+            return response
+        elif method.upper() == "PUT":
+            status, response = await self.api_client.put(path, payload=payload)
+            return response
+        # Add GET/DELETE if needed, though not used for orders
+        return {"success": False, "error": f"Unsupported method {method}"}
+        
         
     # NEW: Deadman Switch Logic (Robustness Feature)
     async def _dms_create_heartbeat(self):
@@ -347,7 +294,8 @@ class OrderExecutionManager:
             # Setting unhealthy_count to 1 means the first missed ACK cancels all open orders
             "config": [{"action": "cancel_orders", "unhealthy_count": 1}] 
         }
-        resp = await self._dms_send_request("POST", path, payload)
+        # UPDATED: Use api_client.post
+        status, resp = await self.api_client.post(path, payload=payload)
         if resp.get("success"):
             logger.info("✅ Deadman Switch Heartbeat created successfully.")
         else:
@@ -358,24 +306,16 @@ class OrderExecutionManager:
         path = "/v2/heartbeat"
         payload = {"heartbeat_id": self.dms_id, "ttl": ttl_ms}
         
-        # ✅ FIX: Use simple retry loop internally for stability
-        for attempt in range(1, self.MAX_RETRIES + 1):
-            resp = await self._dms_send_request("POST", path, payload)
-            if resp.get("success"):
-                logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
-                return True
-            else:
-                # Only log as warning for transient errors, but treat as failure if it's an API error
-                if attempt < self.MAX_RETRIES and 'error' in resp:
-                    logger.warning(f"⚠️ DMS Ack failed (Attempt {attempt}/{self.MAX_RETRIES}): {resp}. Retrying...")
-                    await asyncio.sleep(self.RETRY_DELAY)
-                elif 'error' not in resp:
-                    # Non-API failure (e.g., disconnection caught by _dms_send_request)
-                    return False
-                else:
-                    logger.error(f"❌ DMS Acknowledgment failed persistently after {self.MAX_RETRIES} attempts.")
-                    return False
-        return False
+        # UPDATED: Use api_client.post. The retry logic is now *inside* the client.
+        status, resp = await self.api_client.post(path, payload=payload)
+        
+        if resp.get("success"):
+            logger.debug(f"❤️ DMS Acknowledgment sent: {resp.get('result')}")
+            return True
+        else:
+            # Only log as warning for transient errors, but treat as failure if it's an API error
+            logger.error(f"❌ DMS Acknowledgment failed persistently: {resp}")
+            return False
 
 
     async def _dms_loop(self):
@@ -393,7 +333,7 @@ class OrderExecutionManager:
                 
                 # If acknowledgment failed, pause execution longer before next attempt
                 if not success:
-                    await asyncio.sleep(self.RETRY_DELAY * 4) # Pause longer if connection is bad
+                    await asyncio.sleep(config["API_RETRY_DELAY"] * 4) # Pause longer if connection is bad
                 else:
                     # Send acknowledgment just before the TTL expires (TTL: 30s)
                     await asyncio.sleep(25) 
@@ -421,9 +361,12 @@ class OrderExecutionManager:
         size_hint = float(signal.get("size_hint", config.get("BASE_POSITION_SIZE", 1)))
         tp_price = signal.get("tp_price")
         sl_price = signal.get("sl_price") # Initial SL for the bracket order
+        
+        # ⭐️ FIX: Get the trigger_price from the signal to pass to the TSL manager
+        trigger_price = signal.get("trigger_price") # This is the mid_price at time of signal
 
-        if not all([symbol, direction, size_hint, tp_price, sl_price]):
-             logger.error(f"Invalid signal received, missing key fields: {signal}")
+        if not all([symbol, direction, size_hint, tp_price, sl_price, trigger_price]):
+             logger.error(f"Invalid signal received, missing key fields (incl. trigger_price): {signal}")
              return
 
         lock_acquired = await self._acquire_position_lock(symbol)
@@ -442,8 +385,8 @@ class OrderExecutionManager:
                 await self._notify_monitor(symbol, size_hint, product_id)
                 
                 if TSL_ENABLED:
-                    # Pass trade direction and the initial SL price (as a base for TSL)
-                    await self._notify_tsl_manager(symbol, trade_direction, size_hint, product_id, sl_price)
+                    # ⭐️ FIX: Pass the trigger_price as the starting price, not the sl_price
+                    await self._notify_tsl_manager(symbol, trade_direction, size_hint, product_id, trigger_price)
                     
                 logger.info("✅ Trade executed for %s [%s]. TSL Manager notified.", symbol, direction)
             else:
@@ -463,11 +406,11 @@ class OrderExecutionManager:
             "direction": direction,
             "size": size,
             "product_id": product_id,
-            "entry_price": entry_price, # Initial SL price used here as a safer proxy for the TSL state
+            "entry_price": entry_price, # ⭐️ This now correctly holds the trade's entry price
             "timestamp": time.time(),
         }
         await self.redis.publish(TSL_CHANNEL, json.dumps(msg))
-        logger.info(f"📢 Notified TSL Manager to start tracking {symbol} (ID: {product_id})")
+        logger.info(f"📢 Notified TSL Manager to start tracking {symbol} (ID: {product_id}) at entry: {entry_price}")
 
     async def _notify_monitor(self, symbol: str, size: float, product_id: int):
         msg = {

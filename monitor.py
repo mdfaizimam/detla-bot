@@ -1,5 +1,5 @@
 # --- monitor.py ---
-# Complete Updated File
+# UPDATED: Refactored to use centralized DeltaAPIClient
 
 import asyncio
 import json
@@ -8,27 +8,27 @@ import aiohttp
 import urllib.parse
 from redis import asyncio as aioredis
 from config import DELTA_BASE_URL, API_KEY, API_SECRET, REDIS_URL, MONITORING_CHANNEL, USER_AGENT
-from utils.signing import generate_server_synced_signature
+# NEW: Import the centralized client
+from utils.api_client import DeltaAPIClient
 
 logger = logging.getLogger("monitor")
-logger.setLevel(logging.INFO)
-
 
 class PositionMonitor:
     """
     Accepts shared clients and monitors open positions.
     """
 
-    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession):
+    def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient):
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.redis = redis_client   
-        self.session = http_session 
+        # UPDATED: Store the api_client
+        self.api_client = api_client 
         self.is_monitoring = False
         self.current_position = None
         self.monitoring_task = None
         
-        self._created_redis = False # Flag to track if we created our own session
+        self._created_redis = False
 
     async def connect(self):
         """Initialize connections"""
@@ -46,34 +46,16 @@ class PositionMonitor:
         try:
             path = "/v2/positions"
             params = {"product_id": product_id} 
-            query_string = urllib.parse.urlencode(params)
-            
-            signature, timestamp = await generate_server_synced_signature("GET", path, "", query_string)
-
-            headers = {
-                "api-key": self.api_key,
-                "timestamp": str(timestamp),
-                "signature": signature,
-                "Content-Type": "application/json",
-                "User-Agent": USER_AGENT
-            }
-
-            url = f"{DELTA_BASE_URL}{path}"
             logger.debug(f"🔍 Fetching position for product_id: {product_id}")
 
-            async with self.session.get(url, headers=headers, params=params) as resp:
-                response_text = await resp.text()
-                
-                if resp.status == 200:
-                    try:
-                         data = await resp.json()
-                         return data.get("result", {})
-                    except json.JSONDecodeError as e:
-                        logger.error(f"❌ JSON decode error: {e}")
-                        return None 
-                else:
-                    logger.error(f"❌ API error fetching position {product_id}: HTTP {resp.status} | Body: {response_text[:200]}")
-                    return None 
+            # UPDATED: Use the centralized API client
+            status, data = await self.api_client.get(path, params=params)
+
+            if status == 200:
+                return data.get("result", {})
+            else:
+                logger.error(f"❌ API error fetching position {product_id}: HTTP {status} | Body: {data.get('error')}")
+                return None 
 
         except Exception as e:
             logger.error(f"❌ Error fetching position {product_id}: {e}")

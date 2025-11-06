@@ -56,7 +56,7 @@ class FeatureEngine:
 
     def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, top_n=5):
         self.redis = redis_client 
-        self.session = http_session 
+        self.session = http_session # Used for unauthenticated candle priming
         self.top_n = top_n
         
         self.order_books = {} 

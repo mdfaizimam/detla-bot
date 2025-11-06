@@ -1,5 +1,5 @@
 # --- config.py ---
-# Complete Updated File (with Dynamic TSL Parameters)
+# Complete Updated File (with Dynamic TSL Parameters & API Retry Config)
 
 import os
 from pathlib import Path
@@ -119,6 +119,10 @@ WS_HEARTBEAT_INTERVAL = 30
 RATE_LIMIT_REST = 100
 RATE_LIMIT_WS = 150
 
+# API Client retry policy
+API_MAX_RETRIES = 3
+API_RETRY_DELAY = 1.0
+
 # ----------------------------------------------------------------------
 # ✅ Redis Channels & Data Management
 # ----------------------------------------------------------------------
@@ -190,6 +194,10 @@ config = {
     "USER_AGENT": USER_AGENT,
     
     "LOG_LEVEL": LOG_LEVEL, 
+    
+    # API Client Config
+    "API_MAX_RETRIES": API_MAX_RETRIES,
+    "API_RETRY_DELAY": API_RETRY_DELAY,
 }
 
 # ----------------------------------------------------------------------

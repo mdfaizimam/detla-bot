@@ -1,17 +1,25 @@
 # --- ws_manager.py ---
-# Complete Updated File (with Control Channel Listener)
+# FIX: Changed 'authenticate' to use the new synchronous signing function
+# which returns the full payload.
 
 import asyncio
 import json
 import logging
 import aiohttp
 import redis.asyncio as aioredis
-from config import WS_URL, RAW_CHANNEL, TRADING_SYMBOLS, USER_AGENT, SPOT_INDEX_SYMBOLS, CONTROL_CHANNEL
+from config import (
+    WS_URL, 
+    RAW_CHANNEL, 
+    TRADING_SYMBOLS, 
+    USER_AGENT, 
+    SPOT_INDEX_SYMBOLS, 
+    CONTROL_CHANNEL,
+    API_KEY,  # Import credentials
+    API_SECRET
+)
 from utils.signing import generate_ws_keyauth_signature_for_live
 
 logger = logging.getLogger("ws_manager")
-logger.setLevel(logging.INFO)
-
 
 class WebSocketManager:
     """
@@ -57,15 +65,21 @@ class WebSocketManager:
         try:
             if self.is_authenticated:
                 return
-            auth_payload = generate_ws_keyauth_signature_for_live()
-            await self.ws.send_json(auth_payload)
+            
+            # --- FIX START ---
+            # 1. Call the synchronous function (no 'await')
+            # 2. This function now returns the complete JSON payload dictionary
+            auth_payload = generate_ws_keyauth_signature_for_live(API_KEY, API_SECRET)
+            # --- FIX END ---
+            
+            await self.ws.send_json(auth_payload) # Send the dictionary directly
             logger.info("🔐 Sent authentication payload to WebSocket")
         except Exception as e:
-            logger.error(f"❌ Authentication error: {e}")
+            logger.error(f"❌ Authentication error: {e}", exc_info=True)
 
     async def _handle_control_messages(self):
         """
-        NEW: Listens to the internal control channel for commands 
+        Listens to the internal control channel for commands 
         like RESUBSCRIBE_L2 from the FeatureEngine.
         """
         pubsub = self.redis.pubsub()
@@ -203,7 +217,8 @@ class WebSocketManager:
 
                     msg_type = data.get("type", "unknown")
 
-                    if msg_type not in ("subscriptions", "ping", "pong", "heartbeat"):
+                    # Reduce log noise
+                    if msg_type not in ("subscriptions", "ping", "pong", "heartbeat", "l2_updates", "all_trades", "mark_price"):
                         logger.info(f"🛰️ WS Message: {msg_type}")
 
                     if msg_type == "key-auth" and data.get("success"):
