@@ -1,5 +1,7 @@
 # --- feature_engine.py ---
-# Complete Updated File (Caching Enriched Data for Dynamic TSL)
+# FIX: Added '_is_processing_buffer' flag to solve the second
+#      race condition, ensuring live messages wait until the
+#      initial buffer is fully processed.
 
 import asyncio
 import json
@@ -25,7 +27,7 @@ from config import (
     ATR_TIMEFRAME,
     SPOT_INDEX_SYMBOLS,
     CONTROL_CHANNEL,
-    LATEST_ENRICHED_KEY # IMPORTED FOR CACHE KEY
+    LATEST_ENRICHED_KEY 
 ) 
 
 log = logging.getLogger("feature_engine")
@@ -35,7 +37,6 @@ TFI_LOOKBACK_SECONDS = 5
 TRADE_LOG_TTL_SECONDS = 60 
 CANDLE_HISTORY_SIZE = 100 
 
-# 💥 FIX: Removed "30d" from CANDLE_RESOLUTIONS
 CANDLE_RESOLUTIONS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 RESOLUTION_SECONDS = {
     "1m": 60, 
@@ -68,6 +69,14 @@ class FeatureEngine:
         self.symbol_ready_state = {}
         
         self.candle_regex = re.compile(r"candlestick_(\w+)")
+        
+        # --- FIX: State flags for handling priming race condition ---
+        self._stop_flag = False
+        self._is_priming = True
+        self._is_processing_buffer = False # <-- FIX: New flag
+        self._message_buffer = deque()
+        # --- End Fix ---
+
 
     async def _publish(self, payload: dict):
         """Publish enriched data to Redis."""
@@ -85,7 +94,11 @@ class FeatureEngine:
     def _initialize_state(self, symbol):
         """Creates new, empty state structures for a symbol."""
         if symbol not in self.order_books:
-            self.order_books[symbol] = {"bids": {}, "asks": {}}
+            self.order_books[symbol] = {
+                "bids": {}, 
+                "asks": {},
+                "is_awaiting_snapshot": True  # State to control logging
+            }
             log.info(f"Initialized new order book for {symbol}")
         
         if symbol not in self.trade_logs:
@@ -127,6 +140,9 @@ class FeatureEngine:
 
     def _is_symbol_ready(self, symbol: str) -> bool:
         """Checks if all required data has been received for a symbol."""
+        if self._is_priming or self._is_processing_buffer: # <-- FIX: Check buffer flag
+            return False
+            
         if symbol not in self.symbol_ready_state:
             return False
             
@@ -154,15 +170,13 @@ class FeatureEngine:
         # Reset book state to wait for the new snapshot
         self.symbol_ready_state[symbol]["book"] = False
         self.sequence_numbers[symbol] = -1
+        self.order_books[symbol]["is_awaiting_snapshot"] = True
         log.warning(f"⚠️ Published RESUBSCRIBE_L2 request for {symbol}. Invalidating book state.")
 
 
     async def _prime_candle_history(self):
         """
         Fetches historical candle data from the REST API to seed the engine.
-        
-        FIX: Uses a large lookback for low-frequency candles (1d, 1w) to ensure enough 
-        data is fetched for TA.
         """
         log.info("Priming candle history for all symbols...")
         end_time = int(time.time())
@@ -174,14 +188,11 @@ class FeatureEngine:
                     duration = RESOLUTION_SECONDS[res]
                     limit = CANDLE_HISTORY_SIZE + 50 
                     
-                    # 💥 FIX: Logic to calculate start_time based on resolution frequency
                     if res in ["1d", "1w"]:
-                        # For Daily and Weekly, request 2 years of history 
                         two_years_in_seconds = 3600 * 24 * 365 * 2
                         start_time = end_time - two_years_in_seconds
-                        limit = 2000 # Use max API limit to get max data for low-freq TAs
+                        limit = 2000 
                     else:
-                        # For sub-day resolutions, use the smaller, fixed candle count window
                         start_time = end_time - (limit * duration * 1.5) 
                         limit = min(2000, limit)
                     
@@ -228,6 +239,7 @@ class FeatureEngine:
             self._calculate_technical_indicators(symbol)
             
         log.info("✅ Candle history priming and initial TA calculation complete.")
+        self._is_priming = False
 
     # ----------------------------------------------------------------------
     # WebSocket Message Handlers with Checksum/Sequence Validation
@@ -286,10 +298,11 @@ class FeatureEngine:
         for price_str, size_str in data.get("asks", []):
             self.order_books[symbol]["asks"][price_str] = float(size_str)
 
+        self.order_books[symbol]["is_awaiting_snapshot"] = False
         if symbol in self.symbol_ready_state:
             self.symbol_ready_state[symbol]["book"] = True
-        log.info(f"✅ Order book snapshot received and built for {symbol} (Seq: {self.sequence_numbers[symbol]})")
-
+        log.info(f"✅ L2 Snapshot processed for {symbol} (Seq: {self.sequence_numbers[symbol]}). Resuming normal updates.")
+    
     
     def _handle_l2_update(self, data: dict):
         symbol = data.get("symbol")
@@ -298,11 +311,11 @@ class FeatureEngine:
         new_seq_no = data.get("sequence_no", -1)
         received_cs = data.get("cs", -1)
         
-        # 💥 CRITICAL FIX: Stop the Resubscription Loop
         if self.sequence_numbers[symbol] == -1:
-            log.warning(f"⚠️ Skipping L2 update (Seq {new_seq_no}) for {symbol}. Waiting for snapshot to establish sequence.")
+            if self.order_books[symbol]["is_awaiting_snapshot"]:
+                log.warning(f"⚠️ Skipping L2 update (Seq {new_seq_no}) for {symbol}. Waiting for snapshot to establish sequence.")
+                self.order_books[symbol]["is_awaiting_snapshot"] = False
             return 
-        # ---------------------------------------------------------------------------------
 
         # 1. Check sequence number continuity 
         expected_seq_no = self.sequence_numbers[symbol] + 1
@@ -629,81 +642,143 @@ class FeatureEngine:
             
             await self._publish(payload)
             
-    async def start(self):
-        """
-        Primes historical data first, then subscribes to delta:raw:ws 
-        and publishes enriched data to delta:enriched.
-        """
+    # --- FIX: New method to process buffered and live messages ---
+    async def _process_message(self, raw: dict):
+        """Wrapper for the main message processing logic."""
+        msg_type = raw.get("type")
+        timestamp = raw.get("timestamp", 0)
+        symbol = None 
         
         try:
-            await self._prime_candle_history()
-        except Exception as e:
-            log.error(f"💥 Failed to prime candle history: {e}", exc_info=True)
+            # Logic to extract symbol for non-spot messages
+            if msg_type == "mark_price":
+                raw_sym = raw.get("symbol")
+                if raw_sym: symbol = raw_sym.split(":", 1)[-1] 
+            elif msg_type == "v2/spot_price":
+                self._handle_spot_price(raw)
+                return # This message type doesn't need publishing
+            else:
+                symbol = raw.get("symbol") 
             
+            if not symbol or symbol not in TRADING_SYMBOLS:
+                return 
+                
+            should_publish = False
+
+            if msg_type == "l2_updates":
+                action = raw.get("action")
+                if action == "snapshot": self._handle_l2_snapshot(raw)
+                elif action == "update": self._handle_l2_update(raw)
+                should_publish = True
+            
+            elif msg_type == "all_trades_snapshot":
+                self._handle_all_trades_snapshot(raw)
+            
+            elif msg_type == "all_trades":
+                self._handle_all_trades(raw)
+                should_publish = True
+            
+            elif msg_type.startswith("candlestick_"):
+                # FIX: Do not process candle messages if priming
+                if not self._is_priming:
+                    self._handle_candlestick(raw)
+                # If priming, candle messages are just ignored, which is fine
+                # as the historical pull will be more accurate.
+                
+            elif msg_type == "funding_rate":
+                self._handle_funding_rate(raw)
+                should_publish = True
+                
+            elif msg_type == "mark_price":
+                self._handle_mark_price(raw, symbol) 
+                should_publish = True
+
+            elif msg_type == "v2/ticker":
+                log.debug(f"Ticker for {symbol} received and ignored.")
+            
+            if should_publish and self._is_symbol_ready(symbol):
+                await self._publish_features(symbol, timestamp)
+        
+        except Exception as e:
+            log.error(f"Error processing message type {msg_type} for {symbol}: {e}", exc_info=True)
+
+    # --- FIX: New method to listen to Redis immediately ---
+    async def _message_listener(self):
+        """
+        Subscribes to Redis and processes messages.
+        If priming, it buffers messages to be processed later.
+        """
         pubsub = self.redis.pubsub()
         await pubsub.subscribe("delta:raw:ws")
         log.info("✅ FeatureEngine subscribed to delta:raw:ws and waiting for messages...")
 
         try:
             async for msg in pubsub.listen():
-                if msg.get("type") != "message": continue
+                if self._stop_flag:
+                    break
+                if msg.get("type") != "message": 
+                    continue
 
-                try: raw = json.loads(msg.get("data"))
-                except Exception as e: log.warning(f"⚠️ JSON parse failed: {e}"); continue
-
-                msg_type = raw.get("type")
-                timestamp = raw.get("timestamp", 0)
-                symbol = None 
+                try: 
+                    raw = json.loads(msg.get("data"))
+                except Exception as e: 
+                    log.warning(f"⚠️ JSON parse failed: {e}"); continue
                 
-                try:
-                    # Logic to extract symbol for non-spot messages
-                    if msg_type == "mark_price":
-                        raw_sym = raw.get("symbol")
-                        if raw_sym: symbol = raw_sym.split(":", 1)[-1] 
-                    elif msg_type == "v2/spot_price":
-                        self._handle_spot_price(raw)
-                        continue 
-                    else:
-                        symbol = raw.get("symbol") 
-                    
-                    if not symbol or symbol not in TRADING_SYMBOLS:
-                        continue 
-                        
-                    should_publish = False
+                # --- FIX: Added check for _is_processing_buffer ---
+                if self._is_priming or self._is_processing_buffer:
+                    # Buffer messages if priming or buffer processing is in progress
+                    self._message_buffer.append(raw)
+                else:
+                    # Process live messages directly
+                    await self._process_message(raw)
+                # --- END FIX ---
 
-                    if msg_type == "l2_updates":
-                        action = raw.get("action")
-                        if action == "snapshot": self._handle_l2_snapshot(raw)
-                        elif action == "update": self._handle_l2_update(raw)
-                        should_publish = True
-                    
-                    elif msg_type == "all_trades_snapshot":
-                        self._handle_all_trades_snapshot(raw)
-                    
-                    elif msg_type == "all_trades":
-                        self._handle_all_trades(raw)
-                        should_publish = True
-                    
-                    elif msg_type.startswith("candlestick_"):
-                        self._handle_candlestick(raw)
-                        
-                    elif msg_type == "funding_rate":
-                        self._handle_funding_rate(raw)
-                        should_publish = True
-                        
-                    elif msg_type == "mark_price":
-                        self._handle_mark_price(raw, symbol) 
-                        should_publish = True
+        except asyncio.CancelledError:
+            log.info("FeatureEngine listener task cancelled.")
+        except Exception as e:
+            log.error(f"💥 FeatureEngine listener crashed: {e}", exc_info=True)
+        finally:
+            await pubsub.unsubscribe("delta:raw:ws")
 
-                    elif msg_type == "v2/ticker":
-                        log.debug(f"Ticker for {symbol} received and ignored.")
-                    
-                    if should_publish and self._is_symbol_ready(symbol):
-                        await self._publish_features(symbol, timestamp)
-                
-                except Exception as e:
-                    log.error(f"Error processing message type {msg_type} for {symbol}: {e}", exc_info=True)
-
-        except asyncio.CancelledError: log.info("FeatureEngine cancelled.")
-        except Exception as e: log.error(f"💥 FeatureEngine crashed: {e}")
-        finally: log.info("🔻 FeatureEngine stopped cleanly.")
+    # --- FIX: Updated 'start' method to run tasks concurrently ---
+    async def start(self):
+        """
+        Primes historical data while concurrently listening for live messages.
+        """
+        self._stop_flag = False
+        self._is_priming = True
+        self._is_processing_buffer = True # <-- FIX: Set to True initially
+        self._message_buffer.clear()
+        
+        listener_task = asyncio.create_task(self._message_listener())
+        
+        try:
+            # Run priming
+            await self._prime_candle_history()
+            log.info(f"✅ Priming complete. Processing {len(self._message_buffer)} buffered messages...")
+            
+            # Priming is done
+            self._is_priming = False
+            
+            # Process all buffered messages
+            while self._message_buffer:
+                raw_msg = self._message_buffer.popleft()
+                await self._process_message(raw_msg)
+            
+            log.info("✅ Message buffer processed. Now listening for live data.")
+            # --- FIX: All buffers are processed, allow live processing ---
+            self._is_processing_buffer = False
+            
+            # Now, the listener_task will handle messages live.
+            # We just await it to keep the service running.
+            await listener_task
+            
+        except asyncio.CancelledError:
+            log.info("FeatureEngine main task cancelled.")
+        except Exception as e:
+            log.error(f"💥 FeatureEngine main task crashed: {e}", exc_info=True)
+        finally:
+            self._stop_flag = True
+            if listener_task and not listener_task.done():
+                listener_task.cancel()
+            log.info("🔻 FeatureEngine stopped cleanly.")
