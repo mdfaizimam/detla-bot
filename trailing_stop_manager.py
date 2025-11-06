@@ -1,4 +1,6 @@
 # --- trailing_stop_manager.py ---
+# UPDATED: Refactored to use centralized DeltaAPIClient
+# FIX: Correctly initializes 'best_price_seen' from the 'entry_price' message.
 
 import asyncio
 import aiohttp
@@ -22,110 +24,18 @@ from config import (
     ATR_TIMEFRAME, 
     LATEST_ENRICHED_KEY 
 )
-from utils.signing import generate_server_synced_signature 
+from utils.api_client import DeltaAPIClient
 
 logger = logging.getLogger("tsl_manager")
-logger.setLevel(logging.INFO)
-
-# --- Delta Exchange Compliant Signing Functions (Required for authenticated GET/PUT requests) ---
-
-def _generate_sha256_signature(secret: str, message: str) -> str:
-    """Generate HMAC SHA256 signature."""
-    message_bytes = bytes(message, 'utf-8')
-    secret_bytes = bytes(secret, 'utf-8')
-    hash_obj = hmac.new(secret_bytes, message_bytes, hashlib.sha256)
-    return hash_obj.hexdigest()
-
-async def generate_signature(
-    method: str, 
-    path: str, 
-    query_string: str,
-    body: str,
-    api_secret: str,
-) -> Tuple[str, str]:
-    """
-    Generate signature according to Delta Exchange API documentation.
-    Signature = method + timestamp + path + query_string + body
-    """
-    timestamp = str(int(time.time()))
-    
-    signature_data = method + timestamp + path + query_string + body
-    logger.debug(f"TSL Sig Data: {signature_data}")
-    
-    signature = _generate_sha256_signature(api_secret, signature_data)
-    return signature, timestamp
-
-async def _make_authenticated_get_request(
-    session: aiohttp.ClientSession, path: str, params: dict, api_key: str, api_secret: str
-) -> Tuple[int, Optional[Dict]]:
-    """Make authenticated GET request using correct signature building."""
-    
-    query_string = ""
-    if params:
-        sorted_params = sorted(params.items())
-        # CRITICAL: Signature string must use bare joining of parameters, not urllib's encoding
-        query_string = "?" + "&".join([f"{k}={v}" for k, v in sorted_params]) 
-
-    signature, timestamp = await generate_signature(
-        "GET", path, query_string, "", api_secret
-    )
-    
-    headers = {
-        "api-key": api_key,
-        "timestamp": timestamp,
-        "signature": signature,
-        "User-Agent": USER_AGENT,
-        "Content-Type": "application/json",
-    }
-    
-    url = f"{DELTA_BASE_URL}{path}"
-    
-    # params=params here handles the URL encoding for the actual HTTP request
-    async with session.get(url, headers=headers, params=params) as resp: 
-        status = resp.status
-        response_text = await resp.text()
-        return status, json.loads(response_text) if response_text else None
-
-async def _make_authenticated_put_request(
-    session: aiohttp.ClientSession, 
-    path: str, 
-    data: dict,
-    api_key: str,
-    api_secret: str
-) -> Tuple[int, Optional[Dict]]:
-    """Make authenticated PUT request using correct signature building."""
-    query_string = ""
-    
-    # CRITICAL: Convert data to JSON string with consistent formatting (sorted keys, no spaces)
-    body = json.dumps(data, separators=(',', ':'), sort_keys=True)
-    
-    signature, timestamp = await generate_signature(
-        "PUT", path, query_string, body, api_secret
-    )
-    
-    headers = {
-        "api-key": api_key,
-        "timestamp": timestamp,
-        "signature": signature,
-        "User-Agent": USER_AGENT,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-    
-    url = f"{DELTA_BASE_URL}{path}"
-    
-    async with session.put(url, headers=headers, data=body) as resp:
-        status = resp.status
-        response_text = await resp.text()
-        return status, json.loads(response_text) if response_text else None
 
 # --- TrailingStopManager Class ---
 
 class TrailingStopManager:
     
-    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession):
+    def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, api_client: DeltaAPIClient):
         self.redis = redis_client
-        self.session = http_session
+        self.session = http_session # For unauthenticated calls
+        self.api_client = api_client # For authenticated calls
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.tsl_tasks: Dict[int, asyncio.Task] = {} 
@@ -158,13 +68,14 @@ class TrailingStopManager:
         return None
         
     async def fetch_ticker_data(self, symbol: str) -> Optional[float]:
-        """Fetches the live Mark Price for a specific product symbol (Unauthenticated)."""
+        """Fetches the live Mark Price (current_market_price) for a specific product symbol."""
         path = f"/v2/tickers/{symbol}"
         url = f"{DELTA_BASE_URL}{path}"
         
         headers = {'Accept': 'application/json', 'User-Agent': USER_AGENT} 
         
         try:
+            # Use the shared unauthenticated session
             async with self.session.get(url, headers=headers) as resp:
                 response_data = await resp.json()
                 if resp.status == 200 and response_data.get('success'):
@@ -188,9 +99,8 @@ class TrailingStopManager:
             "stop_order_type": "stop_loss_order" 
         }
         
-        status, data = await _make_authenticated_get_request(
-            self.session, path, params, self.api_key, self.api_secret
-        )
+        # UPDATED: Use the centralized API client
+        status, data = await self.api_client.get(path, params=params)
         
         if status == 200 and data and data.get('success'):
             stop_orders = data.get("result", [])
@@ -217,6 +127,8 @@ class TrailingStopManager:
         
         path = "/v2/orders"
         
+        # For SHORT position (size < 0), stop is a 'buy'
+        # For LONG position (size > 0), stop is a 'sell'
         sl_side = "buy" if size < 0 else "sell"
         
         request_data = {
@@ -226,15 +138,14 @@ class TrailingStopManager:
             "side": sl_side,
             # CRITICAL: We update the stop_price and keep the order_type as market_order 
             "order_type": "market_order", 
-            "stop_price": f"{new_stop_price:.4f}",
+            "stop_price": f"{new_stop_price:.4f}", # Format price to string
             "reduce_only": True
         }
         
         logger.info(f"Attempting PUT update for Stop Order {order_id} to price {new_stop_price:.4f}...")
         
-        status, response_data = await _make_authenticated_put_request(
-            self.session, path, request_data, self.api_key, self.api_secret
-        )
+        # UPDATED: Use the centralized API client
+        status, response_data = await self.api_client.put(path, payload=request_data)
         
         if status == 200 and response_data and response_data.get('success'):
             logger.info(f"✅ Stop order {order_id} updated successfully to {new_stop_price:.4f}!")
@@ -245,15 +156,26 @@ class TrailingStopManager:
 
     # --- Core Trailing Logic ---
 
-    async def _trailing_loop(self, product_id: int, symbol: str, direction: str, size: int):
+    async def _trailing_loop(
+        self, 
+        product_id: int, 
+        symbol: str, 
+        direction: str, 
+        size: int, 
+        entry_price: float  # ⭐️ FIX: Accept the initial trade price
+    ):
         """Continuous trailing stop logic using dynamic ATR-based trail amount."""
         
         trail_multiplier = self.tsl_config["trail_multiplier"]
         min_trail_amount = self.tsl_config["min_trail_amount"]
         check_interval = self.tsl_config["check_interval"]
         
-        best_price_seen: float = float('-inf') if direction == "LONG" else float('inf')
+        # ⭐️ FIX: Initialize best_price_seen to the actual entry price
+        # This is the "starting point" you mentioned.
+        best_price_seen: float = entry_price
         stop_order_id: Optional[int] = None
+        
+        logger.info(f"TSL Loop started for {symbol}. Initial best price set to entry price: {best_price_seen:.4f}")
         
         # 1. Wait for the SL order to appear in the exchange system
         wait_attempts = 0
@@ -273,10 +195,11 @@ class TrailingStopManager:
         
         while True:
             try:
-                # 2. Fetch Live Price 
+                # 2. Fetch Live Price (This is the "current_market_price")
                 live_mark_price = await self.fetch_ticker_data(symbol)
                 
                 if live_mark_price is None:
+                    logger.warning(f"Could not fetch live_mark_price for {symbol}. Skipping TSL loop.")
                     await asyncio.sleep(check_interval)
                     continue
 
@@ -289,7 +212,7 @@ class TrailingStopManager:
                     current_trail_amount = dynamic_trail_amount
                     logger.debug(f"Dynamic Trail calculated for {symbol}: ATR={latest_atr:.4f}, Trail={current_trail_amount:.4f}")
                 else:
-                    # Fallback to the original static amount if ATR is missing (e.g., at startup)
+                    # Fallback to the original static amount if ATR is missing
                     current_trail_amount = config["TSL_TRAIL_AMOUNT"]
                     logger.debug(f"ATR missing. Using static fallback trail amount: {current_trail_amount:.4f}")
 
@@ -306,7 +229,7 @@ class TrailingStopManager:
                 if is_new_best:
                     logger.info(f"New Best Mark Price tracked for {symbol}: {best_price_seen:.4f}")
 
-                # 5. Calculate the required Trailing Stop Price
+                # 5. Calculate the required Trailing Stop Price based on the best price
                 if direction == "LONG":
                     # For LONG: Stop Price = Highest Mark Price - Dynamic Trail Amount
                     required_stop_price = best_price_seen - current_trail_amount
@@ -318,9 +241,7 @@ class TrailingStopManager:
                 path = "/v2/orders"
                 params = {"order_ids": str(stop_order_id)}
                 
-                status, order_details = await _make_authenticated_get_request(
-                    self.session, path, params, self.api_key, self.api_secret
-                )
+                status, order_details = await self.api_client.get(path, params=params)
                 
                 current_stop_price = None
                 if status == 200 and order_details and order_details.get('result'):
@@ -329,12 +250,14 @@ class TrailingStopManager:
                         current_stop_price = float(order_result[0].get('stop_price', 0))
                 
                 if current_stop_price is None or current_stop_price == 0.0:
+                    logger.warning(f"Could not find current stop price for order {stop_order_id}. Skipping loop.")
                     await asyncio.sleep(check_interval)
                     continue
                     
-                tolerance = 0.0001 
+                tolerance = 0.0001 # To prevent floating point issues
                 update_required = False
                 
+                # Logic to only move the stop "in profit"
                 if direction == "LONG" and required_stop_price > current_stop_price + tolerance:
                     update_required = True
                 elif direction == "SHORT" and required_stop_price < current_stop_price - tolerance:
@@ -372,13 +295,21 @@ class TrailingStopManager:
         if message_type == "start_tsl" and config["TSL_ENABLED"]:
             direction = data.get("direction")
             size = data.get("size")
+            # ⭐️ FIX: Read the entry_price from the message
+            entry_price = data.get("entry_price")
+            
+            # ⭐️ FIX: Add validation for new required field
+            if not all([direction, size is not None, entry_price is not None]):
+                logger.error(f"TSL Manager received 'start_tsl' for {symbol} but was missing direction, size, or entry_price.")
+                return
             
             if product_id in self.tsl_tasks: return
 
-            logger.info(f"🎯 Starting TSL for {symbol} ({direction}, ID: {product_id})")
+            logger.info(f"🎯 Starting TSL for {symbol} ({direction}, ID: {product_id}) at price {entry_price}")
             
+            # ⭐️ FIX: Pass entry_price to the trailing loop task
             task = asyncio.create_task(
-                self._trailing_loop(product_id, symbol, direction, size),
+                self._trailing_loop(product_id, symbol, direction, size, entry_price),
                 name=f"TSL_Loop_{symbol}_{product_id}"
             )
             self.tsl_tasks[product_id] = task
@@ -412,7 +343,9 @@ class TrailingStopManager:
                         await self._handle_tsl_control_message(data)
                     
                     elif channel == MONITORING_CHANNEL and data.get("type") == "position_closed":
+                        # If monitor sees position closed, stop TSL task
                         closed_symbol = data.get("symbol")
+                        # Infer product_id from running task names
                         inferred_pid = next((pid for pid, task in self.tsl_tasks.items() if task.get_name().split('_')[2] == closed_symbol), None)
                         
                         if inferred_pid:

@@ -295,7 +295,7 @@ class MLForecastingStrategy:
                 "confidence": SIGNAL_CONFIDENCE,
                 "size_hint": contracts_final, # Static size hint
                 "timestamp": enriched.get("timestamp", None),
-                "trigger_price": mid_price,
+                "trigger_price": mid_price, # This is the entry_price
                 "tp_price": round(tp_price, 2), # Static rounding
                 "sl_price": round(sl_price, 2)  # Static rounding
             }

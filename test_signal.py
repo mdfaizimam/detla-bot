@@ -13,6 +13,7 @@ MOCK_SIGNAL_LONG = {
     "direction": "LONG",
     "confidence": 0.95,
     "size_hint": BASE_POSITION_SIZE, # ✅ ADDED: Uses static size (e.g., 1.0)
+    "trigger_price": 3850.00, # ⭐️ ADDED: The entry price
     "tp_price": 3950.00,  
     "sl_price": 3800.00
 }
@@ -23,6 +24,7 @@ MOCK_SIGNAL_SHORT = {
     "direction": "SHORT",
     "confidence": 0.95,
     "size_hint": BASE_POSITION_SIZE, # ✅ ADDED: Uses static size (e.g., 1.0)
+    "trigger_price": 180.00, # ⭐️ ADDED: The entry price
     # Using more realistic prices for SOL (e.g., if price is ~$180)
     "tp_price": 170.00, 
     "sl_price": 190.00
@@ -31,8 +33,8 @@ MOCK_SIGNAL_SHORT = {
 
 async def publish_mock_signal(signal: dict):
     # Quick check for the mandatory size field before sending
-    if 'size_hint' not in signal:
-        print("❌ Error: Signal must contain 'size_hint' for the Executor.")
+    if 'size_hint' not in signal or 'trigger_price' not in signal:
+        print("❌ Error: Signal must contain 'size_hint' and 'trigger_price' for the Executor.")
         return
     
     # Initialize redis client
