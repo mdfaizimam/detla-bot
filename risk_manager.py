@@ -1,5 +1,6 @@
 # --- risk_manager.py ---
 # Complete Updated File (with persistence)
+# UPDATED: Added 'update_equity_with_pnl' to be called by PositionMonitor
 
 import asyncio
 import logging
@@ -48,6 +49,10 @@ class RiskManager:
             if current_eq:
                 self.current_equity = float(current_eq)
                 log.info(f"💾 Loaded Current Equity: {self.current_equity:.2f}")
+            else:
+                # If no current equity, start with peak
+                self.current_equity = self.peak_equity
+                log.info(f"💾 No Current Equity found, setting from Peak: {self.current_equity:.2f}")
 
             # Ensure current is not higher than peak on reload
             self.peak_equity = max(self.peak_equity, self.current_equity)
@@ -94,6 +99,7 @@ class RiskManager:
     async def update_equity(self, new_equity: float):
         """
         Updates equity, checks for breaches, and persists the state.
+        This is the private method that handles the logic.
         """
         self.current_equity = new_equity
         self.peak_equity = max(self.peak_equity, new_equity)
@@ -106,6 +112,26 @@ class RiskManager:
             self.circuit_open = True
             log.critical(f"🚨 CIRCUIT BREAKER TRIPPED: DAILY LOSS LIMIT EXCEEDED 🚨")
 
+    # ✅ --- NEW FUNCTION ---
+    async def update_equity_with_pnl(self, pnl: float):
+        """
+        Updates equity based on the PnL of a closed trade.
+        This is the new link from the PositionMonitor.
+        """
+        try:
+            # Load the most recent state from Redis to prevent race conditions
+            await self._load_state_from_redis()
+            
+            new_equity = self.current_equity + float(pnl)
+            
+            log.info(f"Updating equity with PnL. Start: {self.current_equity:.4f}, PnL: {pnl:.4f}, End: {new_equity:.4f}")
+            
+            # Call the existing update_equity method which handles peak equity and saving
+            await self.update_equity(new_equity)
+            
+        except Exception as e:
+            log.error(f"❌ Error updating equity with PnL: {e}", exc_info=True)
+    # --- END NEW FUNCTION ---
 
     async def reset_circuit(self):
         self.circuit_open = False

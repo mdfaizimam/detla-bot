@@ -1,6 +1,7 @@
 # --- executor.py ---
-# FINAL FIX: Re-wrote the logic in _try_dynamic_sl_tp to be explicit and
-# correctly handle ATR vs. SNR levels, fixing the "Invalid Geometry" bug.
+# FINAL FIX: Removed the internal _try_dynamic_sl_tp function.
+# The executor now trusts the sl_price and tp_price provided
+# directly from the ml_strategy signal payload.
 
 import aiohttp
 import asyncio
@@ -158,140 +159,13 @@ class OrderExecutionManager:
             logger.error("❌ Error fetching ticker for %s: %s", symbol, e)
             return (None, None)
 
-    # ---------------------------
-    # Dynamic SL/TP (SNR + ATR + confidence)
-    # ---------------------------
-    def _detect_snr_levels(self, candles: List[Dict[str, float]], lookback: int = 60) -> Tuple[List[float], List[float]]:
-        """
-        Simple swing-high / swing-low detector on recent candles to produce support/resistance levels.
-        Non-intrusive: if candles missing/too short, returns empty lists.
-        """
-        if not candles or len(candles) < max(lookback, 7):
-            return [], []
-
-        seg = candles[-lookback:]
-        highs = [float(c["high"]) for c in seg]
-        lows = [float(c["low"]) for c in seg]
-
-        resistances: List[float] = []
-        supports: List[float] = []
-
-        # local peaks/troughs with a 2-candle neighborhood
-        for i in range(2, len(seg) - 2):
-            h = highs[i]
-            l = lows[i]
-            if highs[i - 2] < h > highs[i + 2]:
-                resistances.append(h)
-            if lows[i - 2] > l < lows[i + 2]:
-                supports.append(l)
-
-        # Deduplicate (basic) and sort
-        resistances = sorted(set(resistances))
-        supports = sorted(set(supports))
-        return supports, resistances
-
-    # ✅ --- START: MODIFIED FUNCTION ---
-    async def _try_dynamic_sl_tp(
-        self,
-        symbol: str,
-        direction: str,
-        entry: float,
-        confidence: float,
-        precision: int,
-        atr: Optional[float],
-        candles: Optional[List[Dict]]
-    ) -> Optional[Tuple[float, float]]:
-        """
-        Compute dynamic SL/TP using SNR + ATR + confidence.
-        Receives ATR and Candles directly from the signal payload.
-        """
-        if not candles:
-            logger.warning("Dynamic SL/TP: Signal was missing 'candles' data.")
-            return None
-        
-        if not atr:
-            logger.warning("Dynamic SL/TP: Signal was missing 'atr' data, using 0.5%% fallback.")
-            atr = max(entry * 0.005, 0.0001) # 0.5% fallback
-
-        # Base buffers from ATR; scale with confidence
-        # Lower confidence => tighter TP, slightly wider SL
-        tp_mult = 2.5 if confidence < 0.8 else 3.0
-        sl_mult = 1.5 if confidence < 0.6 else 1.0
-
-        tp_buffer = atr * tp_mult
-        sl_buffer = atr * sl_mult
-        
-        # 1. Find nearest SNR levels
-        supports, resistances = self._detect_snr_levels(candles, lookback=60)
-
-        sl_price = 0.0
-        tp_price = 0.0
-
-        if direction == "LONG":
-            # 2. Define ATR-based stops first
-            atr_tp = entry + tp_buffer
-            atr_sl = entry - sl_buffer
-            
-            # 3. Find closest SNR resistance (if any)
-            higher_res = [r for r in resistances if r > entry]
-            snr_tp = min(higher_res) if higher_res else None
-            
-            # 4. Find closest SNR support (if any)
-            lower_sup = [s for s in supports if s < entry]
-            snr_sl = max(lower_sup) if lower_sup else None
-
-            # 5. Use SNR if it's closer, otherwise use ATR
-            #    (min for TP, max for SL, to make the stop *tighter*)
-            tp_price = min(snr_tp, atr_tp) if snr_tp is not None else atr_tp
-            sl_price = max(snr_sl, atr_sl) if snr_sl is not None else atr_sl
-
-        else:  # SHORT
-            # 2. Define ATR-based stops first
-            atr_tp = entry - tp_buffer
-            atr_sl = entry + sl_buffer
-            
-            # 3. Find closest SNR resistance *below* entry (if any)
-            lower_res = [r for r in resistances if r < entry] 
-            snr_tp = max(lower_res) if lower_res else None
-            
-            # 4. Find closest SNR support *above* entry (if any)
-            higher_sup = [s for s in supports if s > entry]
-            snr_sl = min(higher_sup) if higher_sup else None
-            
-            # 5. Use SNR if it's closer, otherwise use ATR
-            #    (max for TP, min for SL, to make the stop *tighter*)
-            tp_price = max(snr_tp, atr_tp) if snr_tp is not None else atr_tp
-            sl_price = min(snr_sl, atr_sl) if snr_sl is not None else atr_sl
-
-        sl_price = round(float(sl_price), precision)
-        tp_price = round(float(tp_price), precision)
-
-        # Sanity: ensure correct orientation; if not, return None to let legacy flow handle
-        if direction == "LONG" and not (sl_price < entry < tp_price):
-            logger.warning(
-                "Dynamic SL/TP: Invalid LONG geometry. SL=%.*f, Entry=%.*f, TP=%.*f",
-                precision, sl_price, precision, entry, precision, tp_price
-            )
-            return None
-        if direction == "SHORT" and not (tp_price < entry < sl_price):
-            logger.warning(
-                "Dynamic SL/TP: Invalid SHORT geometry. TP=%.*f, Entry=%.*f, SL=%.*f",
-                precision, tp_price, precision, entry, precision, sl_price
-            )
-            return None
-
-        logger.info(
-            "🤖 Dynamic SL/TP for %s via SNR+ATR (conf=%.2f): SL=%.*f TP=%.*f (ATR=%.6f)",
-            symbol,
-            confidence,
-            precision,
-            sl_price,
-            precision,
-            tp_price,
-            atr,
-        )
-        return sl_price, tp_price
-    # ✅ --- END: MODIFIED FUNCTION ---
+    # ----------------------------------------------------------------
+    # ✅ --- FIX: REMOVED _try_dynamic_sl_tp FUNCTION ---
+    #
+    # Reason: This logic was redundant and conflicted with the
+    # superior logic in ml_strategy.py. The strategy now passes
+    # sl_price and tp_price directly in the signal payload.
+    # ----------------------------------------------------------------
 
     # ---------------------------
     # Redis position lock
@@ -328,7 +202,7 @@ class OrderExecutionManager:
         Expected signal keys (typical):
           symbol, direction, size_hint
         NEW Expected keys:
-          confidence, atr, candles
+          confidence, atr, candles, sl_price, tp_price
         """
         symbol = signal.get("symbol")
         direction = signal.get("direction")
@@ -364,33 +238,24 @@ class OrderExecutionManager:
             # choose anchor for checks/fallback calc
             anchor_price = mark_price if BRACKET_STOP_TRIGGER == "mark_price" else last_price
 
-            # Get SL/TP from signal or compute
+            # ✅ --- FIX: Get SL/TP from signal payload ---
             sl_price = signal.get("sl_price")
             tp_price = signal.get("tp_price")
             
-            # Get data from signal payload
+            if sl_price and tp_price:
+                logger.info("✅ Received SL/TP from strategy signal. SL=%.*f, TP=%.*f", precision, sl_price, precision, tp_price)
+            # --- END FIX ---
+            
+            # Get data from signal payload (for TSL)
             confidence = float(signal.get("confidence", 0.7))
             atr = signal.get("atr") 
             candles = signal.get("candles")
 
-            # ---- NEW: try dynamic computation first (without breaking old behavior) ----
-            if (sl_price is None or tp_price is None) and anchor_price is not None:
-                # Pass atr and candles
-                dyn = await self._try_dynamic_sl_tp(
-                    symbol=symbol,
-                    direction=direction,
-                    entry=float(anchor_price),
-                    confidence=confidence,
-                    precision=precision,
-                    atr=atr,
-                    candles=candles
-                )
-                if dyn is not None:
-                    sl_price, tp_price = dyn
+            # ---- REMOVED: _try_dynamic_sl_tp call ----
 
             # Legacy fallback (unchanged) if still missing
             if sl_price is None or tp_price is None:
-                # Fallback logic similar to your PowerShell example: 2% SL / 3% TP
+                logger.warning("⚠️ SL/TP not found in signal. Using 2%%/3%% fallback.")
                 if anchor_price is None:
                     logger.error("Cannot compute fallback SL/TP: no live anchor price for %s", symbol)
                     return
@@ -575,6 +440,11 @@ class OrderExecutionManager:
                 "product_id": int(product_id),
                 "timestamp": time.time(),
             }
+            # ✅ --- FIX: Changed message type to 'start_monitoring' ---
+            # This matches the 'start' listener in monitor.py
+            message["type"] = "start_monitoring"
+            # --- END FIX ---
+            
             await self.redis.publish(MONITORING_CHANNEL, json.dumps(message))
             logger.info("📢 Notified PositionMonitor: %s", message)
         except Exception as e:

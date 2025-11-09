@@ -1,4 +1,7 @@
 # --- test_signal.py ---
+# UPDATED: Added 'atr' and 'candles' to the mock payload to
+# match the new signal format from ml_strategy.py
+
 import asyncio
 import json
 import redis.asyncio as aioredis
@@ -12,10 +15,12 @@ MOCK_SIGNAL_LONG = {
     "symbol": "ETHUSD",
     "direction": "LONG",
     "confidence": 0.95,
-    "size_hint": BASE_POSITION_SIZE, # ✅ ADDED: Uses static size (e.g., 1.0)
-    "trigger_price": 3850.00, # ⭐️ ADDED: The entry price
+    "size_hint": BASE_POSITION_SIZE, # ✅ Uses static size (e.g., 1.0)
+    "trigger_price": 3850.00, # ⭐️ The entry price
     "tp_price": 3950.00,  
-    "sl_price": 3800.00
+    "sl_price": 3800.00,
+    "atr": 25.0, # ✅ ADDED: Mock ATR value
+    "candles": [] # ✅ ADDED: Mock candle list
 }
 
 # Mock data for a SHORT trade on SOLUSD (using a priority symbol)
@@ -23,11 +28,12 @@ MOCK_SIGNAL_SHORT = {
     "symbol": "SOLUSD",
     "direction": "SHORT",
     "confidence": 0.95,
-    "size_hint": BASE_POSITION_SIZE, # ✅ ADDED: Uses static size (e.g., 1.0)
-    "trigger_price": 180.00, # ⭐️ ADDED: The entry price
-    # Using more realistic prices for SOL (e.g., if price is ~$180)
+    "size_hint": BASE_POSITION_SIZE, # ✅ Uses static size (e.g., 1.0)
+    "trigger_price": 180.00, # ⭐️ The entry price
     "tp_price": 170.00, 
-    "sl_price": 190.00
+    "sl_price": 190.00,
+    "atr": 2.5, # ✅ ADDED: Mock ATR value
+    "candles": [] # ✅ ADDED: Mock candle list
 }
 
 

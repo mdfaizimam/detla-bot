@@ -1,6 +1,8 @@
 # --- train_model.py ---
 # Complete ML Training Script (Phase 2)
 # FIX: Corrected target labeling for XGBoost (shifts -1, 0, 1 to 0, 1, 2)
+# FIX: Replaced 'train_test_split' with a time-series-aware sequential
+#      split to prevent data leakage from shuffling.
 
 import pandas as pd
 # IMPORTANT: Use the installed name
@@ -91,8 +93,22 @@ def train_and_save_model(df):
     # 0: SHORT (-1), 1: CHOP (0), 2: LONG (1)
     y = df['Target'].replace({-1: 0, 0: 1, 1: 2})
     
-    # --- Split Data ---
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # --- FIX: Split Data (Time-Series Aware) ---
+    # Using a random train_test_split (even with stratify) on time-series
+    # data is a critical bug. It leaks future data into the training set.
+    # We MUST split sequentially.
+    
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    
+    log.info("Splitting data (time-series aware, no shuffle)...")
+    split_index = int(len(X) * 0.8)
+    X_train = X.iloc[:split_index]
+    y_train = y.iloc[:split_index]
+    X_test = X.iloc[split_index:]
+    y_test = y.iloc[split_index:]
+    
+    log.info(f"Train set size: {len(X_train)}, Test set size: {len(X_test)}")
+    # --- END FIX ---
     
     log.info("Starting XGBoost training...")
 
@@ -120,8 +136,11 @@ def train_and_save_model(df):
     log.info(f"Classification Report:\n{classification_report(y_test, y_pred, zero_division=0, target_names=['SHORT (-1)', 'CHOP (0)', 'LONG (1)']).split('\n')[2:]}")
     
     y_proba = model.predict_proba(X_test.to_numpy())
-    auc = roc_auc_score(y_test, y_proba, multi_class='ovr')
-    log.info(f"AUC Score (One-vs-Rest): {auc:.4f}")
+    try:
+        auc = roc_auc_score(y_test, y_proba, multi_class='ovr')
+        log.info(f"AUC Score (One-vs-Rest): {auc:.4f}")
+    except ValueError as e:
+        log.warning(f"Could not calculate AUC Score: {e}")
     
     # --- Saving ---
     os.makedirs(MODEL_DIR, exist_ok=True)

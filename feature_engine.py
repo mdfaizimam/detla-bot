@@ -1,7 +1,7 @@
 # --- feature_engine.py ---
-# FIX: Added '_is_processing_buffer' flag to solve the second
-#      race condition, ensuring live messages wait until the
-#      initial buffer is fully processed.
+# FIX: Replaced the 'is_priming' and 'is_processing_buffer' flags
+# with a single asyncio.Lock (_priming_lock) to create an atomic
+# "priming + buffer processing" state, fixing the race condition.
 
 import asyncio
 import json
@@ -72,9 +72,8 @@ class FeatureEngine:
         
         # --- FIX: State flags for handling priming race condition ---
         self._stop_flag = False
-        self._is_priming = True
-        self._is_processing_buffer = False # <-- FIX: New flag
         self._message_buffer = deque()
+        self._priming_lock = asyncio.Lock() # <-- FIX: New lock
         # --- End Fix ---
 
 
@@ -140,7 +139,8 @@ class FeatureEngine:
 
     def _is_symbol_ready(self, symbol: str) -> bool:
         """Checks if all required data has been received for a symbol."""
-        if self._is_priming or self._is_processing_buffer: # <-- FIX: Check buffer flag
+        # <-- FIX: Check lock
+        if self._priming_lock.locked(): 
             return False
             
         if symbol not in self.symbol_ready_state:
@@ -239,7 +239,7 @@ class FeatureEngine:
             self._calculate_technical_indicators(symbol)
             
         log.info("✅ Candle history priming and initial TA calculation complete.")
-        self._is_priming = False
+        # self._is_priming = False <-- FIX: Removed, lock handles state
 
     # ----------------------------------------------------------------------
     # WebSocket Message Handlers with Checksum/Sequence Validation
@@ -680,7 +680,7 @@ class FeatureEngine:
             
             elif msg_type.startswith("candlestick_"):
                 # FIX: Do not process candle messages if priming
-                if not self._is_priming:
+                if not self._priming_lock.locked():
                     self._handle_candlestick(raw)
                 # If priming, candle messages are just ignored, which is fine
                 # as the historical pull will be more accurate.
@@ -724,8 +724,8 @@ class FeatureEngine:
                 except Exception as e: 
                     log.warning(f"⚠️ JSON parse failed: {e}"); continue
                 
-                # --- FIX: Added check for _is_processing_buffer ---
-                if self._is_priming or self._is_processing_buffer:
+                # --- FIX: Check if the priming lock is held ---
+                if self._priming_lock.locked():
                     # Buffer messages if priming or buffer processing is in progress
                     self._message_buffer.append(raw)
                 else:
@@ -746,28 +746,25 @@ class FeatureEngine:
         Primes historical data while concurrently listening for live messages.
         """
         self._stop_flag = False
-        self._is_priming = True
-        self._is_processing_buffer = True # <-- FIX: Set to True initially
         self._message_buffer.clear()
         
         listener_task = asyncio.create_task(self._message_listener())
         
         try:
             # Run priming
-            await self._prime_candle_history()
-            log.info(f"✅ Priming complete. Processing {len(self._message_buffer)} buffered messages...")
+            # --- FIX: Use the lock to manage the critical section ---
+            async with self._priming_lock:
+                log.info("🔒 Acquired priming lock. Starting history fetch...")
+                await self._prime_candle_history()
+                log.info(f"✅ Priming complete. Processing {len(self._message_buffer)} buffered messages...")
+                
+                # Process all buffered messages
+                while self._message_buffer:
+                    raw_msg = self._message_buffer.popleft()
+                    await self._process_message(raw_msg)
             
-            # Priming is done
-            self._is_priming = False
-            
-            # Process all buffered messages
-            while self._message_buffer:
-                raw_msg = self._message_buffer.popleft()
-                await self._process_message(raw_msg)
-            
-            log.info("✅ Message buffer processed. Now listening for live data.")
-            # --- FIX: All buffers are processed, allow live processing ---
-            self._is_processing_buffer = False
+            log.info("✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.")
+            # --- END FIX ---
             
             # Now, the listener_task will handle messages live.
             # We just await it to keep the service running.

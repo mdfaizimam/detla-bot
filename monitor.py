@@ -1,5 +1,8 @@
 # --- monitor.py ---
 # UPDATED: Refactored to use centralized DeltaAPIClient
+# UPDATED: Accepts RiskManager instance to report PnL on position close.
+# FIX: Corrected a type-hinting error by removing the unnecessary
+#      try/except block around the RiskManager import.
 
 import asyncio
 import json
@@ -11,6 +14,10 @@ from config import DELTA_BASE_URL, API_KEY, API_SECRET, REDIS_URL, MONITORING_CH
 # NEW: Import the centralized client
 from utils.api_client import DeltaAPIClient
 
+# ✅ --- FIX: Import RiskManager directly as a type ---
+from risk_manager import RiskManager
+# --- END FIX ---
+
 logger = logging.getLogger("monitor")
 
 class PositionMonitor:
@@ -18,12 +25,17 @@ class PositionMonitor:
     Accepts shared clients and monitors open positions.
     """
 
-    def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient):
+    # ✅ --- FIX: Use the imported class 'RiskManager' as the type ---
+    def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
+    # --- END FIX ---
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.redis = redis_client   
         # UPDATED: Store the api_client
         self.api_client = api_client 
+        
+        self.risk_manager = risk_manager
+        
         self.is_monitoring = False
         self.current_position = None
         self.monitoring_task = None
@@ -150,6 +162,16 @@ class PositionMonitor:
             }
             await self.redis.publish(MONITORING_CHANNEL, json.dumps(message))
             logger.info(f"📢 Notified position closure: {symbol} (PnL: {pnl})")
+
+            # ✅ --- FIX: Report PnL to RiskManager ---
+            if self.risk_manager:
+                logger.info(f"Reporting PnL of {pnl} to RiskManager.")
+                # Use create_task to avoid blocking the monitor loop
+                asyncio.create_task(self.risk_manager.update_equity_with_pnl(pnl))
+            else:
+                logger.warning("No RiskManager instance found. Cannot report PnL.")
+            # --- END FIX ---
+
         except Exception as e:
             logger.error(f"❌ Failed to notify position closure: {e}")
 
@@ -196,7 +218,6 @@ class PositionMonitor:
                 if msg.get("type") != "message":
                     continue
                 
-                # --- FIX: Removed .decode('utf-8') ---
                 channel = msg['channel'] 
                 
                 if channel != MONITORING_CHANNEL:
