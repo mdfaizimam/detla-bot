@@ -136,6 +136,7 @@ MONITORING_CHANNEL = "delta:monitoring"
 CONTROL_CHANNEL = "delta:control" 
 TSL_CHANNEL = "delta:tsl_control" 
 
+REDIS_POSITION_LOCK_KEY = "active_position"
 LATEST_ENRICHED_KEY = "latest:enriched:" # NEW: Redis Key Prefix for caching FE output
 
 REDIS_DATA_TTL = 3600
