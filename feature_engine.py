@@ -4,6 +4,7 @@
 # "priming + buffer processing" state, fixing the race condition.
 # ✅ FIX: Replaced O(N) TFI calculation with O(1) deque-based method.
 # ✅ FIX: Added health check timestamp writing.
+# ✅ NEW: Added OBV and ADX to _calculate_technical_indicators
 
 import asyncio
 import json
@@ -30,7 +31,7 @@ from config import (
     SPOT_INDEX_SYMBOLS,
     CONTROL_CHANNEL,
     LATEST_ENRICHED_KEY,
-    HEALTH_CHECK_KEY_FE # ✅ NEW: Health check key
+    HEALTH_CHECK_KEY_FE 
 ) 
 
 log = logging.getLogger("feature_engine")
@@ -64,7 +65,7 @@ class FeatureEngine:
         self.top_n = top_n
         
         self.order_books = {} 
-        self.trade_logs = {}  # ✅ FIX: Will now be a deque
+        self.trade_logs = {}  
         self.features = {} 
         self.candle_history = {} 
         self.sequence_numbers = {} # Track sequence numbers for L2 updates
@@ -570,6 +571,11 @@ class FeatureEngine:
                 df.ta.ema(length=50, append=True)
                 df.ta.rsi(length=14, append=True)
                 df.ta.macd(fast=12, slow=26, signal=9, append=True)
+                
+                # ✅ --- NEW: Calculate OBV and ADX ---
+                df.ta.obv(append=True)
+                df.ta.adx(length=14, append=True)
+                # --- END NEW ---
 
                 latest_tas = {
                     "ema_20": df['EMA_20'].iloc[-1],
@@ -578,6 +584,9 @@ class FeatureEngine:
                     "macd_hist": df['MACDh_12_26_9'].iloc[-1],
                     "close": df['close'].iloc[-1],
                     "open": df['open'].iloc[-1],
+                    # ✅ --- NEW: Add OBV and ADX to payload ---
+                    "obv": df['OBV'].iloc[-1],
+                    "adx": df['ADX_14'].iloc[-1],
                 }
                 
                 # --- Volume Filter Calculation ---

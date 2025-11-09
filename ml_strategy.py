@@ -3,8 +3,9 @@
 # FIX: Added 'strategy_lock' to prevent concurrent signal processing.
 # FIX: Changed model target mapping to match train_model.py
 # FIX: Added Stale MTF Data Filter to avoid trading on old candle data.
-# ✅ FIX: Corrected TA key names in _prepare_features to match feature_engine
-# ✅ FIX: Corrected call to self_publish_signal (was an AttributeError)
+# FIX: Corrected TA key names in _prepare_features to match feature_engine
+# FIX: Fixed critical typo (self.self_publish_signal) by publishing directly
+# ✅ NEW: Use real OBV and ADX values from feature_engine payload
 
 import asyncio
 import json
@@ -160,9 +161,17 @@ class MLForecastingStrategy:
             
             if signal_payload:
                 self.last_signal_ts[symbol] = now
-                # ✅ --- CRITICAL FIX: Removed 'self.' ---
-                await self_publish_signal(signal_payload)
+                
+                # ✅ --- CRITICAL FIX: Publish directly using self.redis ---
+                try:
+                    await self.redis.publish(
+                        SIGNAL_CHANNEL, json.dumps(signal_payload)
+                    )
+                    log.info(f"🚀 Published {signal_payload['direction']} Signal for {signal_payload['symbol']}")
+                except Exception as e:
+                    log.error(f"Failed to publish signal: {e}")
                 # --- END FIX ---
+
 
     async def _run_strategy(self, data: dict) -> Optional[Dict[str, Any]]:
         """
@@ -277,7 +286,7 @@ class MLForecastingStrategy:
             vol_sma_key = f"SMA_volume_{self.config['VOLUME_SMA_PERIOD']}"
             vol_sma = tas.get(vol_sma_key)
             
-            # ✅ --- START FIX: Use correct key names from feature_engine ---
+            # ✅ --- START FIX: Use all 9 REAL features ---
             ema_20 = tas.get('ema_20')
             ema_50 = tas.get('ema_50')
             rsi = tas.get('rsi_14')
@@ -285,11 +294,18 @@ class MLForecastingStrategy:
             macd_hist = tas.get('macd_hist')
             volume = tas.get('volume')
             close_price = tas.get('close')
+            # --- NEWLY ADDED ---
+            obv = tas.get('obv')
+            adx = tas.get('adx')
             
             # Check for missing critical data
-            required_keys = [ema_20, ema_50, rsi, atr, macd_hist, volume, vol_sma, close_price]
+            required_keys = [
+                ema_20, ema_50, rsi, atr, macd_hist, 
+                volume, vol_sma, close_price,
+                obv, adx # <-- Added to check
+            ]
             if not all(k is not None for k in required_keys):
-                # This is the check that was failing
+                # This check ensures all 9 features are present
                 return None, None 
             # --- END FIX ---
 
@@ -300,17 +316,13 @@ class MLForecastingStrategy:
                 "ATR": atr,
                 "MACDh": macd_hist,
                 
-                # These are approximations or missing
-                "OBV": 0, # Cannot be calculated from a single tick
-                "ADX": 50, # Cannot be calculated from a single tick
+                # ✅ --- USE REAL VALUES ---
+                "OBV": obv,
+                "ADX": adx,
                 
                 "Vol_Ratio": volume / vol_sma if vol_sma else 1.0,
                 "Close_vs_EMA20": (close_price - ema_20) / close_price * 100 if close_price else 0,
             }
-            
-            # WARNING: The model's accuracy will be poor if OBV and ADX
-            # are not correctly calculated and provided by the feature_engine.
-            # This is a limitation of the current feature_engine payload.
             
             df = pd.DataFrame([features])
             df = df[feature_cols] # Ensure column order
@@ -450,13 +462,3 @@ class MLForecastingStrategy:
             return ratio >= self.config["MIN_RISK_REWARD_RATIO"]
         except Exception:
             return False
-
-async def self_publish_signal(payload: dict):
-    """Publishes the final signal to Redis."""
-    try:
-        await aioredis.from_url(REDIS_URL).publish(
-            SIGNAL_CHANNEL, json.dumps(payload)
-        )
-        log.info(f"🚀 Published {payload['direction']} Signal for {payload['symbol']}")
-    except Exception as e:
-        log.error(f"Failed to publish signal: {e}")
