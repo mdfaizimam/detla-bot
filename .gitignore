@@ -1,5 +1,5 @@
 # New ignored folder
-ignored_folder/*
+ignored_folder/**
 !ignored_folder/.gitkeep
 
 # Existing directories to ignore
