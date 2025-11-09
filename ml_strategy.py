@@ -1,7 +1,7 @@
 # --- ml_strategy.py ---
 # Complete Updated File
-# UPDATED: _calculate_smart_stops now returns ATR
-# UPDATED: _build_signal_if_valid now adds 'atr' and 'candles' to the signal payload
+# UPDATED: _build_signal_if_valid now adds 'sl_price' and 'tp_price' to the signal payload.
+# UPDATED: _decision_loop no longer checks for active_position (fixes race condition).
 
 import asyncio
 import json
@@ -166,7 +166,7 @@ class MLForecastingStrategy:
             return False
         except Exception: return False
 
-    # ✅ --- MODIFIED FUNCTION ---
+    # ✅ --- (Unchanged, for context) ---
     def _calculate_smart_stops(self, direction: str, price: float, enriched: dict) -> Tuple[Optional[float], Optional[float], Optional[float]]:
         # ... (Returns sl_price, tp_price, atr)
         try:
@@ -304,10 +304,12 @@ class MLForecastingStrategy:
                 "size_hint": contracts_final, # Static size hint
                 "timestamp": enriched.get("timestamp", None),
                 "trigger_price": mid_price, # This is the entry_price
-                # "tp_price": round(tp_price, 2), # Removed to allow executor logic
-                # "sl_price": round(sl_price, 2)  # Removed to allow executor logic
                 
-                # ✅ ADDED: Pass data directly to executor
+                # ✅ --- FIX: ADDED SL/TP TO THE SIGNAL ---
+                "tp_price": tp_price,
+                "sl_price": sl_price,
+                # --- END FIX ---
+                
                 "atr": atr_value,
                 "candles": enriched.get("candles", []) 
             }
@@ -328,13 +330,11 @@ class MLForecastingStrategy:
     async def _decision_loop(self):
         while True:
             try:
-                if MAX_CONCURRENT_TRADES > 0:
-                    active_position = await self._redis.get("active_position")
-                    if active_position:
-                        # --- FIX: Removed .decode() ---
-                        log.debug(f"Decision loop paused: Active position '{active_position}' detected.")
-                        await asyncio.sleep(1) 
-                        continue
+                # ✅ --- FIX: REMOVED CHECK FOR 'active_position' ---
+                # This check was causing a race condition.
+                # The Executor's 'acquire_lock' is the only
+                # gatekeeper needed.
+                # --- END FIX ---
                 
                 for symbol in self.priority_list:
                     

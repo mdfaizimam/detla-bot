@@ -1,5 +1,6 @@
 # --- main.py ---
 # UPDATED: To instantiate and inject the new DeltaAPIClient
+# UPDATED: Injects RiskManager into PositionMonitor for PnL reporting
 
 import asyncio
 import signal
@@ -103,8 +104,9 @@ async def run_bot():
         # UPDATED: Inject api_client
         executor = OrderExecutionManager(redis_client, api_client, risk_manager)
         
-        # UPDATED: Inject api_client
-        position_monitor = PositionMonitor(redis_client, api_client)
+        # ✅ --- FIX: Inject RiskManager into PositionMonitor ---
+        position_monitor = PositionMonitor(redis_client, api_client, risk_manager)
+        # --- END FIX ---
         
         # UPDATED: Inject both session (for unauth) and api_client (for auth)
         tsl_manager = TrailingStopManager(redis_client, http_session, api_client) 
