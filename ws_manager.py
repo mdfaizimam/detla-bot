@@ -1,6 +1,7 @@
 # --- ws_manager.py ---
 # FIX: Changed 'authenticate' to use the new synchronous signing function
 # which returns the full payload.
+# FIX: Added routing for private messages to PRIVATE_CHANNEL
 
 import asyncio
 import json
@@ -10,6 +11,7 @@ import redis.asyncio as aioredis
 from config import (
     WS_URL, 
     RAW_CHANNEL, 
+    PRIVATE_CHANNEL, # ✅ NEW: Import private channel
     TRADING_SYMBOLS, 
     USER_AGENT, 
     SPOT_INDEX_SYMBOLS, 
@@ -38,6 +40,14 @@ class WebSocketManager:
         self.reconnect_delay = 3
         self.reconnect_max = 60
         self.backoff_factor = 2
+        
+        # ✅ NEW: Define which messages are private
+        self.PRIVATE_CHANNELS = {
+            "v2/user_trades", 
+            "orders", 
+            "positions", 
+            "margins"
+        }
 
     async def connect(self):
         """Establish WebSocket connection and subscribe to channels."""
@@ -235,8 +245,13 @@ class WebSocketManager:
                          continue
 
                     try:
-                        if msg_type not in ("subscriptions", "key-auth"):
+                        # ✅ --- FIX: Route messages to correct channel ---
+                        if msg_type in self.PRIVATE_CHANNELS:
+                            await self.redis.publish(PRIVATE_CHANNEL, json.dumps(data))
+                        elif msg_type not in ("subscriptions", "key-auth"):
                             await self.redis.publish(RAW_CHANNEL, json.dumps(data))
+                        # --- END FIX ---
+                            
                     except Exception as e:
                         logger.error(f"❌ Redis publish failed: {e}")
 
