@@ -1,10 +1,6 @@
 # --- executor.py ---
-# UPDATED: Bracket Order placement + dynamic live-price SL/TP fallback
-# UPDATED: Uses centralized DeltaAPIClient
-# UPDATED: TSL Manager now trails the bracket SL child (via existing TSL manager)
-# UPDATED: Auto-correct invalid TP/SL sides based on current entry anchor (mark/last)
-# FIXED: Indentation bug in _get_product_info when adding symbol to cache
-# NEW: Dynamic SL/TP based on SNR (support/resistance) + ATR + ML confidence (safe fallback to old 2%/3%)
+# FINAL FIX: Re-wrote the logic in _try_dynamic_sl_tp to be explicit and
+# correctly handle ATR vs. SNR levels, fixing the "Invalid Geometry" bug.
 
 import aiohttp
 import asyncio
@@ -194,48 +190,28 @@ class OrderExecutionManager:
         supports = sorted(set(supports))
         return supports, resistances
 
-    def _safe_get_latest_candles(self, symbol: str) -> List[Dict[str, float]]:
-        if not _FEATURE_ENGINE_AVAILABLE:
-            return []
-        # Accept either static or instance-style getters if user implemented differently
-        try:
-            if hasattr(FeatureEngine, "get_latest_candles"):
-                return list(FeatureEngine.get_latest_candles(symbol) or [])
-        except Exception as e:
-            logger.debug("get_latest_candles not available or failed: %s", e)
-        return []
-
-    def _safe_get_latest_atr(self, symbol: str, default_from_price: float) -> float:
-        if not _FEATURE_ENGINE_AVAILABLE:
-            return max(default_from_price * 0.005, 0.0001)  # 0.5% fallback
-        try:
-            if hasattr(FeatureEngine, "get_latest_atr"):
-                v = FeatureEngine.get_latest_atr(symbol)
-                if v is not None and v > 0:
-                    return float(v)
-        except Exception as e:
-            logger.debug("get_latest_atr not available or failed: %s", e)
-        # safe fallback
-        return max(default_from_price * 0.005, 0.0001)
-
-    def _try_dynamic_sl_tp(
+    # ✅ --- START: MODIFIED FUNCTION ---
+    async def _try_dynamic_sl_tp(
         self,
         symbol: str,
         direction: str,
         entry: float,
         confidence: float,
         precision: int,
+        atr: Optional[float],
+        candles: Optional[List[Dict]]
     ) -> Optional[Tuple[float, float]]:
         """
         Compute dynamic SL/TP using SNR + ATR + confidence.
-        Returns (sl_price, tp_price) or None if data insufficient.
-        Never throws; purely additive—doesn't change legacy flow if it fails.
+        Receives ATR and Candles directly from the signal payload.
         """
-        candles = self._safe_get_latest_candles(symbol)
         if not candles:
+            logger.warning("Dynamic SL/TP: Signal was missing 'candles' data.")
             return None
-
-        atr = self._safe_get_latest_atr(symbol, entry)
+        
+        if not atr:
+            logger.warning("Dynamic SL/TP: Signal was missing 'atr' data, using 0.5%% fallback.")
+            atr = max(entry * 0.005, 0.0001) # 0.5% fallback
 
         # Base buffers from ATR; scale with confidence
         # Lower confidence => tighter TP, slightly wider SL
@@ -244,35 +220,64 @@ class OrderExecutionManager:
 
         tp_buffer = atr * tp_mult
         sl_buffer = atr * sl_mult
-
+        
+        # 1. Find nearest SNR levels
         supports, resistances = self._detect_snr_levels(candles, lookback=60)
 
-        if direction == "LONG":
-            # nearest levels around entry
-            higher_res = [r for r in resistances if r > entry]
-            lower_sup = [s for s in supports if s < entry]
-            nearest_res = min(higher_res) if higher_res else entry + tp_buffer
-            nearest_sup = max(lower_sup) if lower_sup else entry - sl_buffer
+        sl_price = 0.0
+        tp_price = 0.0
 
-            tp_price = min(nearest_res, entry + tp_buffer)
-            sl_price = max(nearest_sup, entry - sl_buffer)
+        if direction == "LONG":
+            # 2. Define ATR-based stops first
+            atr_tp = entry + tp_buffer
+            atr_sl = entry - sl_buffer
+            
+            # 3. Find closest SNR resistance (if any)
+            higher_res = [r for r in resistances if r > entry]
+            snr_tp = min(higher_res) if higher_res else None
+            
+            # 4. Find closest SNR support (if any)
+            lower_sup = [s for s in supports if s < entry]
+            snr_sl = max(lower_sup) if lower_sup else None
+
+            # 5. Use SNR if it's closer, otherwise use ATR
+            #    (min for TP, max for SL, to make the stop *tighter*)
+            tp_price = min(snr_tp, atr_tp) if snr_tp is not None else atr_tp
+            sl_price = max(snr_sl, atr_sl) if snr_sl is not None else atr_sl
 
         else:  # SHORT
-            lower_res = [r for r in resistances if r < entry]
+            # 2. Define ATR-based stops first
+            atr_tp = entry - tp_buffer
+            atr_sl = entry + sl_buffer
+            
+            # 3. Find closest SNR resistance *below* entry (if any)
+            lower_res = [r for r in resistances if r < entry] 
+            snr_tp = max(lower_res) if lower_res else None
+            
+            # 4. Find closest SNR support *above* entry (if any)
             higher_sup = [s for s in supports if s > entry]
-            nearest_res_below = max(lower_res) if lower_res else entry - tp_buffer
-            nearest_sup_above = min(higher_sup) if higher_sup else entry + sl_buffer
-
-            tp_price = max(nearest_res_below, entry - tp_buffer)
-            sl_price = min(nearest_sup_above, entry + sl_buffer)
+            snr_sl = min(higher_sup) if higher_sup else None
+            
+            # 5. Use SNR if it's closer, otherwise use ATR
+            #    (max for TP, min for SL, to make the stop *tighter*)
+            tp_price = max(snr_tp, atr_tp) if snr_tp is not None else atr_tp
+            sl_price = min(snr_sl, atr_sl) if snr_sl is not None else atr_sl
 
         sl_price = round(float(sl_price), precision)
         tp_price = round(float(tp_price), precision)
 
         # Sanity: ensure correct orientation; if not, return None to let legacy flow handle
         if direction == "LONG" and not (sl_price < entry < tp_price):
+            logger.warning(
+                "Dynamic SL/TP: Invalid LONG geometry. SL=%.*f, Entry=%.*f, TP=%.*f",
+                precision, sl_price, precision, entry, precision, tp_price
+            )
             return None
         if direction == "SHORT" and not (tp_price < entry < sl_price):
+            logger.warning(
+                "Dynamic SL/TP: Invalid SHORT geometry. TP=%.*f, Entry=%.*f, SL=%.*f",
+                precision, tp_price, precision, entry, precision, sl_price
+            )
             return None
 
         logger.info(
@@ -286,6 +291,7 @@ class OrderExecutionManager:
             atr,
         )
         return sl_price, tp_price
+    # ✅ --- END: MODIFIED FUNCTION ---
 
     # ---------------------------
     # Redis position lock
@@ -320,7 +326,9 @@ class OrderExecutionManager:
     async def _handle_signal(self, signal: dict):
         """
         Expected signal keys (typical):
-          symbol, direction ("LONG"/"SHORT"), size_hint (contracts), sl_price, tp_price
+          symbol, direction, size_hint
+        NEW Expected keys:
+          confidence, atr, candles
         """
         symbol = signal.get("symbol")
         direction = signal.get("direction")
@@ -359,16 +367,23 @@ class OrderExecutionManager:
             # Get SL/TP from signal or compute
             sl_price = signal.get("sl_price")
             tp_price = signal.get("tp_price")
+            
+            # Get data from signal payload
             confidence = float(signal.get("confidence", 0.7))
+            atr = signal.get("atr") 
+            candles = signal.get("candles")
 
             # ---- NEW: try dynamic computation first (without breaking old behavior) ----
             if (sl_price is None or tp_price is None) and anchor_price is not None:
-                dyn = self._try_dynamic_sl_tp(
+                # Pass atr and candles
+                dyn = await self._try_dynamic_sl_tp(
                     symbol=symbol,
                     direction=direction,
                     entry=float(anchor_price),
                     confidence=confidence,
                     precision=precision,
+                    atr=atr,
+                    candles=candles
                 )
                 if dyn is not None:
                     sl_price, tp_price = dyn
