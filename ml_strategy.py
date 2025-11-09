@@ -1,5 +1,7 @@
 # --- ml_strategy.py ---
-# Complete Updated File (Reverted to Static Sizing)
+# Complete Updated File
+# UPDATED: _calculate_smart_stops now returns ATR
+# UPDATED: _build_signal_if_valid now adds 'atr' and 'candles' to the signal payload
 
 import asyncio
 import json
@@ -164,13 +166,15 @@ class MLForecastingStrategy:
             return False
         except Exception: return False
 
-
-    def _calculate_smart_stops(self, direction: str, price: float, enriched: dict) -> Tuple[Optional[float], Optional[float]]:
-        # ... (Unchanged logic for smart stops)
+    # ✅ --- MODIFIED FUNCTION ---
+    def _calculate_smart_stops(self, direction: str, price: float, enriched: dict) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+        # ... (Returns sl_price, tp_price, atr)
         try:
             atr_data = enriched.get("tas", {}).get(ATR_TIMEFRAME, {})
             atr = atr_data.get("atr")
-            if atr is None or atr == 0: return None, None
+            if atr is None or atr == 0: 
+                return None, None, None # ✅ MODIFIED
+            
             sl_price = price - (atr * SL_ATR_MULTIPLIER) if direction == "LONG" else price + (atr * SL_ATR_MULTIPLIER)
 
             daily_tas = enriched.get("tas", {}).get("1d", {})
@@ -181,20 +185,22 @@ class MLForecastingStrategy:
             if direction == "LONG":
                 resistance_levels = [daily_tas.get("R1"), daily_tas.get("R2"), daily_tas.get("R3"), pwh, pmh]
                 valid_resistances = [r for r in resistance_levels if r is not None and r > price]
-                if not valid_resistances: return None, None
+                if not valid_resistances: 
+                    return None, None, None # ✅ MODIFIED
                 nearest_r = min(valid_resistances)
                 tp_price = nearest_r - buffer
             else: # SHORT
                 support_levels = [daily_tas.get("S1"), daily_tas.get("S2"), daily_tas.get("S3"), pwl, pml]
                 valid_supports = [s for s in support_levels if s is not None and s < price]
-                if not valid_supports: return None, None
+                if not valid_supports: 
+                    return None, None, None # ✅ MODIFIED
                 nearest_s = max(valid_supports)
                 tp_price = nearest_s + buffer
                 
-            return sl_price, tp_price
+            return sl_price, tp_price, atr # ✅ MODIFIED
         except Exception as e:
             log.error(f"Error calculating smart stops: {e}", exc_info=True)
-            return None, None
+            return None, None, None # ✅ MODIFIED
 
 
     def _check_ml_filter(self, direction: str, enriched: dict) -> bool:
@@ -247,6 +253,7 @@ class MLForecastingStrategy:
     # Signal Decision Logic (Static Size)
     # ------------------------------------------------------------------ #
 
+    # ✅ --- MODIFIED FUNCTION ---
     def _build_signal_if_valid(self, enriched: dict) -> dict | None:
         
         symbol = enriched.get("symbol", "UNKNOWN")
@@ -269,7 +276,8 @@ class MLForecastingStrategy:
         # --- 3. Final GATES: R/R, TP/SL, and ML Check ---
         if is_trend_aligned and is_funding_aligned and is_volume_confirmed and is_snr_clear:
             
-            sl_price, tp_price = self._calculate_smart_stops(microstructure_signal, mid_price, enriched)
+            # ✅ MODIFIED: Capture atr_value
+            sl_price, tp_price, atr_value = self._calculate_smart_stops(microstructure_signal, mid_price, enriched)
             if sl_price is None or tp_price is None:
                 log.debug(f"Signal for {symbol} blocked: Could not calculate smart TP/SL.")
                 return None
@@ -296,8 +304,12 @@ class MLForecastingStrategy:
                 "size_hint": contracts_final, # Static size hint
                 "timestamp": enriched.get("timestamp", None),
                 "trigger_price": mid_price, # This is the entry_price
-                "tp_price": round(tp_price, 2), # Static rounding
-                "sl_price": round(sl_price, 2)  # Static rounding
+                # "tp_price": round(tp_price, 2), # Removed to allow executor logic
+                # "sl_price": round(sl_price, 2)  # Removed to allow executor logic
+                
+                # ✅ ADDED: Pass data directly to executor
+                "atr": atr_value,
+                "candles": enriched.get("candles", []) 
             }
         
         return None
