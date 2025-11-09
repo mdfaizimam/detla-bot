@@ -1,2 +1,0 @@
-# Create an empty file to maintain the folder structure in git
-touch ignored_folder/.gitkeep
