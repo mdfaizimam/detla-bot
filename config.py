@@ -1,6 +1,6 @@
 # --- config.py ---
 # Complete Updated File (with Dynamic TSL Parameters & API Retry Config)
-# FIX: Removed duplicate variable definitions at the end of the file.
+# FIX: Removed hardcoded API key/secret fallbacks. Must be loaded from env.
 # FIX: Added PRIVATE_CHANNEL for event-driven monitoring
 
 import os
@@ -16,8 +16,10 @@ load_dotenv()
 # ----------------------------------------------------------------------
 # ✅ Core Environment Config
 # ----------------------------------------------------------------------
-API_KEY = os.getenv("DELTA_API_KEY", "")
-API_SECRET = os.getenv("DELTA_API_SECRET", "")
+# 🔒 FIX: Removed hardcoded default ("") for security.
+# Bot will now fail on startup if these are not in the environment.
+API_KEY = os.getenv("DELTA_API_KEY")
+API_SECRET = os.getenv("DELTA_API_SECRET")
 WS_URL = "wss://socket.india.delta.exchange"
 DELTA_BASE_URL = "https://api.india.delta.exchange" 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -140,6 +142,8 @@ TSL_CHANNEL = "delta:tsl_control"
 
 REDIS_POSITION_LOCK_KEY = "active_position"
 LATEST_ENRICHED_KEY = "latest:enriched:" # NEW: Redis Key Prefix for caching FE output
+# ✅ NEW: Health check key
+HEALTH_CHECK_KEY_FE = "health:fe:last_ts"
 
 REDIS_DATA_TTL = 3600
 CACHE_EXPIRY = 300

@@ -2,6 +2,9 @@
 # UPDATED: To instantiate and inject the new DeltaAPIClient
 # UPDATED: Injects RiskManager into PositionMonitor for PnL reporting
 # FIX: Calls risk_manager.start() to enable the daily reset loop
+# ✅ NEW: Adds API key assertion on startup
+# ✅ NEW: Calls server time sync on startup
+# ✅ NEW: Adds /healthz endpoint for production monitoring
 
 import asyncio
 import signal
@@ -9,8 +12,10 @@ import logging
 import logging.handlers  
 import os                
 import aiohttp
+from aiohttp import web # ✅ NEW: Import for health check
 from redis import asyncio as aioredis 
 import queue 
+import time
 
 from ws_manager import WebSocketManager
 from feature_engine import FeatureEngine
@@ -22,7 +27,9 @@ from trailing_stop_manager import TrailingStopManager
 
 # NEW: Import the centralized API client
 from utils.api_client import DeltaAPIClient
-from config import REDIS_URL, config, API_KEY, API_SECRET
+# ✅ NEW: Import time sync
+from utils.signing import sync_time_offset 
+from config import REDIS_URL, config, API_KEY, API_SECRET, HEALTH_CHECK_KEY_FE
 
 # --- Systematic Logging Setup (FIXED FOR THREAD-SAFETY) ---
 
@@ -69,12 +76,69 @@ logger = logging.getLogger("main")
 
 # --- End of Logging Setup ---
 
+# ✅ --- NEW: Health Check Handler ---
+async def health_check_handler(request: web.Request) -> web.Response:
+    """
+    Checks the health of all critical components.
+    Returns HTTP 200 if healthy, HTTP 503 if unhealthy.
+    """
+    try:
+        components = request.app['components']
+        redis_client = components['redis']
+        ws_manager = components['ws_manager']
+        
+        # 1. Check Redis Ping
+        await redis_client.ping()
+        
+        # 2. Check WebSocket Authentication
+        if not ws_manager.is_authenticated:
+            raise Exception("WebSocket is not authenticated.")
+            
+        # 3. Check FeatureEngine (is it processing data?)
+        last_fe_ts_str = await redis_client.get(HEALTH_CHECK_KEY_FE)
+        if not last_fe_ts_str:
+            raise Exception("FeatureEngine has not processed any data.")
+            
+        last_fe_ts = int(last_fe_ts_str)
+        # Check if timestamp (in microseconds) is older than 5 minutes
+        if (time.time() * 1_000_000 - last_fe_ts) > (5 * 60 * 1_000_000):
+            raise Exception(f"FeatureEngine data is stale ({(time.time() * 1_000_000 - last_fe_ts) / 1_000_000:.0f}s old).")
+
+        # All checks passed
+        return web.json_response({"status": "healthy"}, status=200)
+
+    except Exception as e:
+        logger.error(f"❌ Health check failed: {e}", exc_info=True)
+        return web.json_response({"status": "unhealthy", "reason": str(e)}, status=503)
+
+async def start_health_server(components: dict) -> web.AppRunner:
+    """Initializes and starts the lightweight health check web server."""
+    app = web.Application()
+    app['components'] = components # Make components accessible to the handler
+    app.router.add_get("/healthz", health_check_handler)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    # 9090 is a common port for health checks
+    site = web.TCPSite(runner, '0.0.0.0', 9090) 
+    await site.start()
+    logger.info("🩺 Health check server started on http://0.0.0.0:9090/healthz")
+    return runner
+# --- END HEALTH CHECK ---
+
 
 async def run_bot():
     logger.info("🚀 Starting Delta Institutional Trading Bot")
+    
+    # ✅ --- FIX: Assert API keys are present ---
+    assert API_KEY is not None and API_SECRET is not None, \
+        "FATAL: DELTA_API_KEY and DELTA_API_SECRET not found in environment. Please check your .env file."
+    logger.info("✅ API Credentials loaded.")
+    # --- END FIX ---
 
     redis_client = None
     http_session = None
+    health_runner = None # ✅ NEW
     tasks = [] 
     
     # 💥 FIX: Start the listener immediately 
@@ -88,6 +152,10 @@ async def run_bot():
         
         http_session = aiohttp.ClientSession()
         logger.info("🔗 HTTP ClientSession created")
+        
+        # ✅ --- FIX: Sync time with server on startup ---
+        await sync_time_offset(http_session)
+        # --- END FIX ---
 
         # --- NEW: Instantiate Centralized API Client ---
         api_client = DeltaAPIClient(http_session, API_KEY, API_SECRET)
@@ -112,6 +180,14 @@ async def run_bot():
         
         # UPDATED: Inject both session (for unauth) and api_client (for auth)
         tsl_manager = TrailingStopManager(redis_client, http_session, api_client) 
+
+        # ✅ --- NEW: Start health check server ---
+        components = {
+            "redis": redis_client,
+            "ws_manager": ws_manager
+        }
+        health_runner = await start_health_server(components)
+        # --- END NEW ---
 
         # Start all services concurrently
         tasks = [
@@ -143,6 +219,10 @@ async def run_bot():
         
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+            
+        if health_runner:
+            await health_runner.cleanup() # ✅ NEW
+            logger.info("🔻 Health check server stopped")
             
         if http_session:
             await http_session.close()
