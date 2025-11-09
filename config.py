@@ -150,6 +150,10 @@ LOG_FILE = LOG_PATH / "bot.log"
 AUDIT_LOG_FILE = LOG_PATH / "audit.log"
 os.makedirs(LOG_PATH, exist_ok=True)
 
+BRACKET_STOP_TRIGGER = "mark_price"   # "mark_price" (recommended) or "last_traded_price"
+BRACKET_ORDER_TYPE   = "limit_order"  # "limit_order" (as in your PS script) or "market_order"
+
+
 # ----------------------------------------------------------------------
 # ✅ Derived Config Object (for easy passing)
 # ----------------------------------------------------------------------
