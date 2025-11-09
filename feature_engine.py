@@ -2,6 +2,8 @@
 # FIX: Replaced the 'is_priming' and 'is_processing_buffer' flags
 # with a single asyncio.Lock (_priming_lock) to create an atomic
 # "priming + buffer processing" state, fixing the race condition.
+# ✅ FIX: Replaced O(N) TFI calculation with O(1) deque-based method.
+# ✅ FIX: Added health check timestamp writing.
 
 import asyncio
 import json
@@ -27,7 +29,8 @@ from config import (
     ATR_TIMEFRAME,
     SPOT_INDEX_SYMBOLS,
     CONTROL_CHANNEL,
-    LATEST_ENRICHED_KEY 
+    LATEST_ENRICHED_KEY,
+    HEALTH_CHECK_KEY_FE # ✅ NEW: Health check key
 ) 
 
 log = logging.getLogger("feature_engine")
@@ -61,7 +64,7 @@ class FeatureEngine:
         self.top_n = top_n
         
         self.order_books = {} 
-        self.trade_logs = {}  
+        self.trade_logs = {}  # ✅ FIX: Will now be a deque
         self.features = {} 
         self.candle_history = {} 
         self.sequence_numbers = {} # Track sequence numbers for L2 updates
@@ -75,6 +78,9 @@ class FeatureEngine:
         self._message_buffer = deque()
         self._priming_lock = asyncio.Lock() # <-- FIX: New lock
         # --- End Fix ---
+        
+        # ✅ NEW: Health check state
+        self.last_processed_timestamp = 0
 
 
     async def _publish(self, payload: dict):
@@ -101,14 +107,17 @@ class FeatureEngine:
             log.info(f"Initialized new order book for {symbol}")
         
         if symbol not in self.trade_logs:
-            self.trade_logs[symbol] = []
-            log.info(f"Initialized new trade log for {symbol}")
+            # ✅ FIX: Use a deque for O(1) TFI calculation
+            self.trade_logs[symbol] = deque()
+            log.info(f"Initialized new trade log (deque) for {symbol}")
 
         if symbol not in self.features:
             self.features[symbol] = {
                 "obi": 0.0,
                 "mid_price": None,
                 "tfi": 0.0,
+                # ✅ FIX: Add TFI state for O(1) calculation
+                "tfi_state": {"buy_vol": 0.0, "sell_vol": 0.0},
                 "last_trade_price": None,
                 "mark_price": None,
                 "funding_rate": None,
@@ -351,39 +360,71 @@ class FeatureEngine:
         if not symbol: return
         self._initialize_state(symbol)
         log.info(f"Processing trade snapshot for {symbol}...")
-        for trade in data.get("trades", []): self._log_trade(symbol, trade)
+        
+        current_time_sec = time.time() # Get time once
+        for trade in data.get("trades", []): 
+            self._log_trade(symbol, trade, current_time_sec)
+            
         log.info(f"✅ Trade snapshot processed for {symbol}")
 
     def _handle_all_trades(self, trade: dict):
         symbol = trade.get("symbol")
         if not symbol: return
-        self._log_trade(symbol, trade)
-        self._prune_trade_log(symbol) 
+        current_time_sec = time.time()
+        self._log_trade(symbol, trade, current_time_sec)
+        # Pruning is now handled inside _log_trade
 
-    def _log_trade(self, symbol: str, trade: dict):
+    # ✅ --- FIX: O(1) TFI LOGIC ---
+    def _log_trade(self, symbol: str, trade: dict, current_time_sec: float):
         if symbol not in self.trade_logs: self._initialize_state(symbol)
         try:
             side = None
             if trade.get("buyer_role") == "taker": side = "buy"
             elif trade.get("seller_role") == "taker": side = "sell"
+            
             if side:
-                ts = trade.get("timestamp", 0) / 1_000_000.0
+                ts = trade.get("timestamp", 0) / 1_000_000.0 # Convert to seconds
                 size = float(trade.get("size", 0))
                 price = float(trade.get("price", 0))
+                
+                # Add to deque and update running volumes
                 self.trade_logs[symbol].append((ts, side, size))
+                tfi_state = self.features[symbol]["tfi_state"]
+                
+                if side == "buy": 
+                    tfi_state["buy_vol"] += size
+                elif side == "sell": 
+                    tfi_state["sell_vol"] += size
+                    
                 self.features[symbol]["last_trade_price"] = price
-        except Exception as e: log.warning(f"Could not parse trade data: {e} | Data: {trade}")
+                
+                # Prune immediately
+                self._prune_trade_log(symbol, current_time_sec)
+                
+        except Exception as e: 
+            log.warning(f"Could not parse trade data: {e} | Data: {trade}")
 
-    def _prune_trade_log(self, symbol: str):
+    def _prune_trade_log(self, symbol: str, current_time_sec: float):
+        """O(1) amortized pruning. Removes expired trades from deque and TFI state."""
         if symbol not in self.trade_logs: return
-        cutoff_time = time.time() - TFI_LOOKBACK_SECONDS
-        first_valid_index = 0
-        for i, (ts, _, _) in enumerate(self.trade_logs[symbol]):
-            if ts >= cutoff_time:
-                first_valid_index = i
+        
+        cutoff_time = current_time_sec - TFI_LOOKBACK_SECONDS
+        tfi_state = self.features[symbol]["tfi_state"]
+        
+        # Iterate from the left (oldest) and remove expired trades
+        while self.trade_logs[symbol]:
+            if self.trade_logs[symbol][0][0] < cutoff_time:
+                (ts, side, size) = self.trade_logs[symbol].popleft()
+                
+                # Subtract the expired trade volume
+                if side == "buy": 
+                    tfi_state["buy_vol"] = max(0, tfi_state["buy_vol"] - size)
+                elif side == "sell": 
+                    tfi_state["sell_vol"] = max(0, tfi_state["sell_vol"] - size)
+            else:
+                # The oldest trade is still valid, so we're done
                 break
-        if first_valid_index > 0:
-            self.trade_logs[symbol] = self.trade_logs[symbol][first_valid_index:]
+    # ✅ --- END O(1) TFI FIX ---
 
     def _handle_candlestick(self, data: dict):
         symbol = data.get("symbol")
@@ -483,23 +524,22 @@ class FeatureEngine:
             log.error(f"Error calculating OBI for {symbol}: {e}", exc_info=True)
             return 0.0, None
             
+    # ✅ --- FIX: O(1) TFI CALCULATION ---
     def _calculate_tfi(self, symbol: str):
-        """Calculates Trade Flow Index (TFI) over a lookback window."""
-        if symbol not in self.trade_logs: return 0.0
-        buy_vol = 0.0
-        sell_vol = 0.0
-        cutoff_time = time.time() - TFI_LOOKBACK_SECONDS
+        """Calculates Trade Flow Index (TFI) from the running state."""
+        if symbol not in self.features: return 0.0
+        
         try:
-            for (ts, side, size) in reversed(self.trade_logs[symbol]):
-                if ts < cutoff_time: break 
-                if side == "buy": buy_vol += size
-                elif side == "sell": sell_vol += size
+            state = self.features[symbol]["tfi_state"]
+            buy_vol = state["buy_vol"]
+            sell_vol = state["sell_vol"]
             denom = buy_vol + sell_vol
             tfi = (buy_vol - sell_vol) / denom if denom else 0.0
             return tfi
         except Exception as e:
             log.error(f"Error calculating TFI for {symbol}: {e}", exc_info=True)
             return 0.0
+    # ✅ --- END O(1) TFI FIX ---
 
     def _calculate_technical_indicators(self, symbol: str):
         """
@@ -608,6 +648,8 @@ class FeatureEngine:
         if mid_price is not None:
             self.features[symbol]["obi"] = obi
             self.features[symbol]["mid_price"] = mid_price
+            
+        # ✅ FIX: TFI is now O(1)
         tfi = self._calculate_tfi(symbol)
         self.features[symbol]["tfi"] = tfi
         
@@ -633,18 +675,28 @@ class FeatureEngine:
                 "PML": self.features[symbol].get("PML"),
             }
             
-            # ✅ NEW STEP: Cache the complete enriched payload for other services (like TSL)
+            # ✅ NEW: Cache the complete enriched payload for other services (like TSL)
             try:
                 # Cache using the key prefix and symbol, set expiry
                 await self.redis.set(f"{LATEST_ENRICHED_KEY}{symbol}", json.dumps(payload), ex=300) 
             except Exception as e:
                 log.error(f"❌ Failed to cache enriched event to Redis: {e}")
             
+            # ✅ NEW: Write timestamp for health check (set to expire after 5 mins)
+            try:
+                await self.redis.set(HEALTH_CHECK_KEY_FE, timestamp_us, ex=300)
+            except Exception as e:
+                log.error(f"❌ Failed to write health check key to Redis: {e}")
+            
             await self._publish(payload)
             
     # --- FIX: New method to process buffered and live messages ---
     async def _process_message(self, raw: dict):
         """Wrapper for the main message processing logic."""
+        
+        # ✅ NEW: Update health check timestamp
+        self.last_processed_timestamp = raw.get("timestamp", 0)
+        
         msg_type = raw.get("type")
         timestamp = raw.get("timestamp", 0)
         symbol = None 

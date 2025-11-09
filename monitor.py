@@ -5,12 +5,17 @@
 #          lock on position close, enabling the next trade.
 # FIX: Replaced all REST API polling with a fully event-driven
 #      listener on the PRIVATE_CHANNEL for 'positions' messages.
+# ✅ FIX: Implemented a hybrid event/poll system. A fallback poller
+#      queries the REST API if WS events stop, preventing a stuck lock.
+# ✅ FIX: Added missing import for Optional
 
 import asyncio
 import json
 import logging
 import aiohttp
 import urllib.parse
+import time 
+from typing import Optional # ✅ FIX: Added Optional
 from redis import asyncio as aioredis
 from config import (
     DELTA_BASE_URL, API_KEY, API_SECRET, REDIS_URL, 
@@ -29,17 +34,22 @@ logger = logging.getLogger("monitor")
 class PositionMonitor:
     """
     Accepts shared clients and monitors open positions via WebSocket events.
+    Includes a REST polling fallback to ensure lock release.
     """
 
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.redis = redis_client   
-        self.api_client = api_client # Keep for future use (e.g., fallback checks)
+        self.api_client = api_client 
         self.risk_manager = risk_manager
         
         self.is_monitoring = False
         self.current_position = None # Will store {'symbol', 'size', 'product_id', 'appearance_confirmed'}
+        
+        # ✅ NEW: State for fallback poller
+        self._poller_task: Optional[asyncio.Task] = None
+        self.last_ws_update_time: Optional[float] = None
         
         self._created_redis = False
 
@@ -103,6 +113,16 @@ class PositionMonitor:
             'appearance_confirmed': False # Wait for WS event
         }
         self.is_monitoring = True
+        self.last_ws_update_time = time.time() # Set initial time
+        
+        # ✅ NEW: Start the fallback poller task
+        if self._poller_task:
+            self._poller_task.cancel()
+            
+        self._poller_task = asyncio.create_task(
+            self._fallback_poller(product_id), 
+            name=f"MonitorPoll-{symbol}"
+        )
         
         logger.info(f"🎯 Started monitoring position: {symbol} (size: {size}, ID: {product_id}). Waiting for WS 'positions' event...")
         # --- END FIX ---
@@ -112,9 +132,14 @@ class PositionMonitor:
         """Stop monitoring current position"""
         self.is_monitoring = False
         self.current_position = None
+        self.last_ws_update_time = None
 
-        # ✅ --- FIX: No monitoring_task to cancel ---
-        # self.monitoring_task = None 
+        # ✅ NEW: Cancel the fallback poller task
+        if self._poller_task and not self._poller_task.done():
+            self._poller_task.cancel()
+            logger.info("🛑 Stopped fallback poller.")
+        self._poller_task = None 
+        
         logger.info("🛑 Position monitoring stopped")
         
         # ✅ --- FIX: Safety net to release lock if monitor is stopped externally ---
@@ -129,6 +154,55 @@ class PositionMonitor:
         except Exception as e:
             logger.error("❌ Error releasing lock in stop_monitoring (safety net): %s", e)
         # --- END FIX ---
+
+    # ✅ --- NEW: Fallback Poller ---
+    async def _fallback_poller(self, product_id: int):
+        """
+        Periodically polls the REST API as a fallback.
+        This ensures the lock is released even if WS messages are missed.
+        """
+        await asyncio.sleep(30) # Initial grace period
+        
+        while self.is_monitoring:
+            try:
+                await asyncio.sleep(60) # Poll every 60 seconds
+                
+                if not self.is_monitoring:
+                    break
+                    
+                # If we received a WS update in the last 90s, trust the WS
+                if self.last_ws_update_time and (time.time() - self.last_ws_update_time) < 90:
+                    continue
+                    
+                logger.warning(f"⚠️ No private WS position update received for >90s. Forcing REST API poll for {self.current_position['symbol']}.")
+                
+                # Use the "real-time" position endpoint
+                status, data = await self.api_client.get(
+                    "/v2/positions",
+                    params={"product_id": product_id}
+                )
+                
+                if status == 200 and data and data.get("success"):
+                    position_data = data.get("result", {})
+                    
+                    # Check if position size is 0
+                    if float(position_data.get("size", 1.0)) == 0.0:
+                        logger.info(f"✅ Detected position closed for {self.current_position['symbol']} via REST fallback poller.")
+                        
+                        # We don't have PnL from this endpoint, so report 0.0
+                        # The PnL reporting is best-effort; lock release is critical.
+                        await self._notify_position_closed(self.current_position['symbol'], 0.0) 
+                        await self.stop_monitoring() # This will stop the loop
+                        break
+                else:
+                    logger.error(f"Fallback poller failed to get position data (HTTP {status}): {data}")
+                    
+            except asyncio.CancelledError:
+                logger.info(f"Fallback poller for {product_id} cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"❌ Error in fallback poller: {e}", exc_info=True)
+    # --- END FALLBACK POLLER ---
 
 
     def is_active(self):
@@ -170,13 +244,16 @@ class PositionMonitor:
                         # Only process if we are actively monitoring a trade
                         if not self.is_monitoring:
                             continue
+                            
+                        # ✅ NEW: Update WS timestamp
+                        self.last_ws_update_time = time.time()
 
                         # Check if it's a position update
                         if data.get("type") == "positions":
                             pos_product_id = data.get("product_id")
                             
                             # Check if this update is for the position we care about
-                            if pos_product_id == self.current_position['product_id']:
+                            if self.current_position and pos_product_id == self.current_position['product_id']:
                                 current_size = float(data.get("size", 0))
                                 
                                 # --- A) Check for position closure ---
