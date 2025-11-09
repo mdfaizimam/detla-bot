@@ -1,6 +1,7 @@
 # --- config.py ---
 # Complete Updated File (with Dynamic TSL Parameters & API Retry Config)
 # FIX: Removed duplicate variable definitions at the end of the file.
+# FIX: Added PRIVATE_CHANNEL for event-driven monitoring
 
 import os
 from pathlib import Path
@@ -128,6 +129,7 @@ API_RETRY_DELAY = 1.0
 # ✅ Redis Channels & Data Management
 # ----------------------------------------------------------------------
 RAW_CHANNEL = "delta:raw:ws"
+PRIVATE_CHANNEL = "delta:private:ws" # ✅ NEW: For private WS messages
 ENRICHED_CHANNEL = "delta:enriched"
 SIGNAL_CHANNEL = "delta:signals"
 EXECUTION_CHANNEL = "delta:executions"

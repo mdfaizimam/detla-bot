@@ -1,11 +1,14 @@
 # --- risk_manager.py ---
 # Complete Updated File (with persistence)
 # UPDATED: Added 'update_equity_with_pnl' to be called by PositionMonitor
+# FIX: Added start() method and _daily_reset_loop to reset the
+#      circuit breaker and peak_equity for the new day.
 
 import asyncio
 import logging
 import time
 import json
+import datetime # ✅ NEW: Import datetime
 from typing import Tuple
 from redis import asyncio as aioredis # Import Redis Client
 
@@ -28,14 +31,21 @@ class RiskManager:
         self._redis = redis_client 
         
         self.max_drawdown_pct = MAX_DRAWDOWN_PERCENT
-        self.daily_loss_limit = MAX_DAILY_LOSS_PERCENT
+        self.daily_loss_limit = MAX_DAILY_LOSS_PERCENT # This is the "daily" trigger
         
         # Initializing defaults, state loaded in async load method
         self.peak_equity = 1.0
         self.current_equity = 1.0
         self.circuit_open = False
+        self._reset_task = None
         
         log.info(f"✅ RiskManager initialized (In-memory defaults): Max Drawdown={self.max_drawdown_pct*100}%, Daily Loss Limit={self.daily_loss_limit*100}%")
+
+    # ✅ --- NEW: Start method for background task ---
+    async def start(self):
+        """Starts the daily reset loop task."""
+        self._reset_task = asyncio.create_task(self._daily_reset_loop())
+        log.info("RiskManager daily reset loop started.")
 
     async def _load_state_from_redis(self):
         """Loads persistent equity state from Redis."""
@@ -79,6 +89,7 @@ class RiskManager:
          - available margin (placeholder)
         """
         if self.circuit_open:
+            log.warning("Signal blocked: Circuit breaker is open.")
             return False, {"reason": "circuit_breaker_open"}
             
         # size_hint check is now implicit in ml_strategy calculation but safety check remains
@@ -87,10 +98,19 @@ class RiskManager:
             return False, {"reason": "invalid_or_zero_size", "size_hint": size_hint}
             
         # check drawdown
-        if (self.peak_equity - self.current_equity) / max(self.peak_equity, 1e-9) > self.max_drawdown_pct:
+        current_drawdown = (self.peak_equity - self.current_equity) / max(self.peak_equity, 1e-9)
+        
+        # Check against the overall max drawdown (a hard stop)
+        if current_drawdown > self.max_drawdown_pct:
             self.circuit_open = True
-            log.critical("🚨 CIRCUIT BREAKER TRIPPED: MAX DRAWDOWN EXCEEDED 🚨")
-            return False, {"reason": "drawdown_breached"}
+            log.critical(f"🚨 CIRCUIT BREAKER TRIPPED: MAX DRAWDOWN EXCEEDED ({current_drawdown*100:.2f}%) 🚨")
+            return False, {"reason": "max_drawdown_breached"}
+
+        # Check against the daily loss limit (a soft, daily stop)
+        if current_drawdown > self.daily_loss_limit:
+            self.circuit_open = True
+            log.critical(f"🚨 CIRCUIT BREAKER TRIPPED: DAILY LOSS LIMIT EXCEEDED ({current_drawdown*100:.2f}%) 🚨")
+            return False, {"reason": "daily_loss_breached"}
             
         # (Placeholder for margin checks)
         
@@ -102,17 +122,22 @@ class RiskManager:
         This is the private method that handles the logic.
         """
         self.current_equity = new_equity
+        # Peak equity is the *daily* high-water mark for PnL calculation
         self.peak_equity = max(self.peak_equity, new_equity)
         
         # Persist the state immediately
         await self._save_state_to_redis()
         
-        # auto open circuit if daily loss > threshold (placeholder)
-        if (self.peak_equity - self.current_equity) / max(self.peak_equity, 1e-9) > self.daily_loss_limit:
+        # Check if this update *causes* a breach
+        current_drawdown = (self.peak_equity - self.current_equity) / max(self.peak_equity, 1e-9)
+        if current_drawdown > self.daily_loss_limit:
             self.circuit_open = True
-            log.critical(f"🚨 CIRCUIT BREAKER TRIPPED: DAILY LOSS LIMIT EXCEEDED 🚨")
+            log.critical(f"🚨 CIRCUIT BREAKER TRIPPED (on update): DAILY LOSS LIMIT EXCEEDED ({current_drawdown*100:.2f}%) 🚨")
+        elif current_drawdown > self.max_drawdown_pct:
+             self.circuit_open = True
+             log.critical(f"🚨 CIRCUIT BREAKER TRIPPED (on update): MAX DRAWDOWN EXCEEDED ({current_drawdown*100:.2f}%) 🚨")
 
-    # ✅ --- NEW FUNCTION ---
+    # ✅ --- (Original) NEW FUNCTION ---
     async def update_equity_with_pnl(self, pnl: float):
         """
         Updates equity based on the PnL of a closed trade.
@@ -133,6 +158,46 @@ class RiskManager:
             log.error(f"❌ Error updating equity with PnL: {e}", exc_info=True)
     # --- END NEW FUNCTION ---
 
-    async def reset_circuit(self):
+    # ✅ --- NEW: Daily Reset Logic ---
+    async def reset_daily_limits(self):
+        """Resets the daily loss circuit breaker and peak equity."""
+        log.warning("--- RESETTING DAILY RISK LIMITS (00:00 UTC) ---")
         self.circuit_open = False
-        log.info("circuit breaker reset")
+        
+        # Reset the peak_equity to the current equity.
+        # This starts a new "high-water mark" for the day.
+        self.peak_equity = self.current_equity
+        
+        # Persist this new state
+        await self._save_state_to_redis()
+        log.info(f"Circuit breaker reset. New daily peak equity set to: {self.peak_equity:.4f}")
+
+    async def _daily_reset_loop(self):
+        """A background task that sleeps until midnight UTC, then resets limits."""
+        try:
+            while True:
+                # Get current time in UTC
+                now_utc = datetime.datetime.now(datetime.timezone.utc)
+                
+                # Calculate the next midnight UTC
+                tomorrow_utc = (now_utc + datetime.timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                
+                # Calculate seconds to sleep
+                seconds_until_midnight = (tomorrow_utc - now_utc).total_seconds()
+                
+                log.info(f"RiskManager reset: Sleeping for {seconds_until_midnight:.0f} seconds (until 00:00 UTC).")
+                
+                await asyncio.sleep(seconds_until_midnight)
+                
+                # --- Time to reset ---
+                await self.reset_daily_limits()
+                
+                # Sleep for a short duration to prevent rapid looping if something is wrong
+                await asyncio.sleep(60) 
+                
+        except asyncio.CancelledError:
+            log.info("Daily reset loop cancelled.")
+        except Exception as e:
+            log.error(f"💥 Daily reset loop crashed: {e}", exc_info=True)

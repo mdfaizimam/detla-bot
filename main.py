@@ -1,6 +1,7 @@
 # --- main.py ---
 # UPDATED: To instantiate and inject the new DeltaAPIClient
 # UPDATED: Injects RiskManager into PositionMonitor for PnL reporting
+# FIX: Calls risk_manager.start() to enable the daily reset loop
 
 import asyncio
 import signal
@@ -97,7 +98,8 @@ async def run_bot():
         feature_engine = FeatureEngine(redis_client, http_session) 
         
         risk_manager = RiskManager(redis_client)
-        await risk_manager._load_state_from_redis()
+        await risk_manager._load_state_from_redis() # Load equity state
+        await risk_manager.start() # ✅ --- FIX: Start the daily reset loop ---
 
         strategy = MLForecastingStrategy(redis_client) 
         
