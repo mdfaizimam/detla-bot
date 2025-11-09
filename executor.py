@@ -2,6 +2,13 @@
 # FINAL FIX: Removed the internal _try_dynamic_sl_tp function.
 # The executor now trusts the sl_price and tp_price provided
 # directly from the ml_strategy signal payload.
+#
+# ✅ --- CRITICAL FIX ---
+# The Executor NO LONGER RELEASES THE LOCK on a successful trade.
+# It holds the lock until the Monitor releases it,
+# enforcing MAX_CONCURRENT_TRADES = 1.
+# It ONLY releases the lock if an order fails or an exception occurs.
+# --- END FIX ---
 
 import aiohttp
 import asyncio
@@ -27,6 +34,7 @@ from config import (
     config,
     BRACKET_STOP_TRIGGER,
     BRACKET_ORDER_TYPE,
+    REDIS_POSITION_LOCK_KEY # ✅ --- FIX: Import global lock key ---
 )
 from utils.api_client import DeltaAPIClient
 from risk_manager import RiskManager
@@ -43,7 +51,9 @@ logger = logging.getLogger("executor")
 
 
 class OrderExecutionManager:
-    REDIS_POSITION_LOCK_KEY = "active_position"
+    # ✅ --- FIX: Use global lock key ---
+    REDIS_POSITION_LOCK_KEY_GLOBAL = REDIS_POSITION_LOCK_KEY
+    # --- END FIX ---
     REDIS_POSITION_LOCK_TTL = 60
 
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
@@ -66,7 +76,7 @@ class OrderExecutionManager:
 
     # ---------------------------
     # Lifecycle
-    # ---------------------------
+    # ... (start and close methods are unchanged) ...
     async def start(self):
         """Main signal-consumer loop."""
         logger.info("▶️ OrderExecutionManager starting (listening for signals)...")
@@ -89,10 +99,7 @@ class OrderExecutionManager:
 
     async def close(self):
         logger.info("🔒 Executor connections closed by main.")
-
-    # ---------------------------
-    # Helpers: product & price
-    # ---------------------------
+    # ... (helpers _get_product_info, _get_ticker_prices are unchanged) ...
     async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
         Fetches product details (id, tick_size, precision) by symbol and caches them.
@@ -158,15 +165,6 @@ class OrderExecutionManager:
         except Exception as e:
             logger.error("❌ Error fetching ticker for %s: %s", symbol, e)
             return (None, None)
-
-    # ----------------------------------------------------------------
-    # ✅ --- FIX: REMOVED _try_dynamic_sl_tp FUNCTION ---
-    #
-    # Reason: This logic was redundant and conflicted with the
-    # superior logic in ml_strategy.py. The strategy now passes
-    # sl_price and tp_price directly in the signal payload.
-    # ----------------------------------------------------------------
-
     # ---------------------------
     # Redis position lock
     # ---------------------------
@@ -175,7 +173,8 @@ class OrderExecutionManager:
         lock_value = json.dumps({"symbol": symbol, "ts": time.time()})
         while time.time() < deadline:
             ok = await self.redis.set(
-                self.REDIS_POSITION_LOCK_KEY,
+                # ✅ --- FIX: Use global lock key ---
+                self.REDIS_POSITION_LOCK_KEY_GLOBAL, 
                 lock_value,
                 ex=self.REDIS_POSITION_LOCK_TTL,
                 nx=True,
@@ -189,7 +188,8 @@ class OrderExecutionManager:
 
     async def _release_position_lock(self):
         try:
-            await self.redis.delete(self.REDIS_POSITION_LOCK_KEY)
+            # ✅ --- FIX: Use global lock key ---
+            await self.redis.delete(self.REDIS_POSITION_LOCK_KEY_GLOBAL)
             logger.info("🔓 Released distributed position lock")
         except Exception as e:
             logger.error("❌ Error releasing lock: %s", e)
@@ -199,10 +199,8 @@ class OrderExecutionManager:
     # ---------------------------
     async def _handle_signal(self, signal: dict):
         """
-        Expected signal keys (typical):
-          symbol, direction, size_hint
-        NEW Expected keys:
-          confidence, atr, candles, sl_price, tp_price
+        Expected signal keys:
+          symbol, direction, size_hint, sl_price, tp_price
         """
         symbol = signal.get("symbol")
         direction = signal.get("direction")
@@ -223,11 +221,13 @@ class OrderExecutionManager:
             logger.warning("Another position in progress; skipping signal for %s", symbol)
             return
 
+        # ✅ --- FIX: Wrap in try/except to release lock on failure ---
         try:
             # Calculate prices: prefer signal-provided SL/TP; else compute from live price (fallback)
             product_info = await self._get_product_info(symbol)
             if not product_info:
                 logger.error("Missing product info for %s", symbol)
+                await self._release_position_lock() # Release lock
                 return
 
             precision = int(product_info["precision"])
@@ -238,26 +238,19 @@ class OrderExecutionManager:
             # choose anchor for checks/fallback calc
             anchor_price = mark_price if BRACKET_STOP_TRIGGER == "mark_price" else last_price
 
-            # ✅ --- FIX: Get SL/TP from signal payload ---
+            # Get SL/TP from signal payload
             sl_price = signal.get("sl_price")
             tp_price = signal.get("tp_price")
             
             if sl_price and tp_price:
                 logger.info("✅ Received SL/TP from strategy signal. SL=%.*f, TP=%.*f", precision, sl_price, precision, tp_price)
-            # --- END FIX ---
             
-            # Get data from signal payload (for TSL)
-            confidence = float(signal.get("confidence", 0.7))
-            atr = signal.get("atr") 
-            candles = signal.get("candles")
-
-            # ---- REMOVED: _try_dynamic_sl_tp call ----
-
             # Legacy fallback (unchanged) if still missing
             if sl_price is None or tp_price is None:
                 logger.warning("⚠️ SL/TP not found in signal. Using 2%%/3%% fallback.")
                 if anchor_price is None:
                     logger.error("Cannot compute fallback SL/TP: no live anchor price for %s", symbol)
+                    await self._release_position_lock() # Release lock
                     return
                 entry_reference = float(anchor_price)
 
@@ -301,7 +294,8 @@ class OrderExecutionManager:
                 symbol, side, float(size_hint), float(tp_price), float(sl_price)
             )
             if not res:
-                logger.error("Order placement failed for %s", symbol)
+                logger.error("Order placement failed for %s. Releasing lock.", symbol)
+                await self._release_position_lock() # Release lock
                 return
 
             product_id, ret_direction = res
@@ -315,16 +309,20 @@ class OrderExecutionManager:
             if TSL_ENABLED:
                 await self._notify_tsl_manager(symbol, ret_direction, float(size_hint), product_id, entry_price)
 
-            logger.info("✅ Signal executed for %s (size=%s)", symbol, size_hint)
+            logger.info("✅ Signal executed for %s (size=%s). Lock is HELD.", symbol, size_hint)
+            
+            # --- DO NOT RELEASE LOCK HERE ---
 
         except Exception as e:
-            logger.error("❌ Error handling signal: %s", e, exc_info=True)
-        finally:
+            logger.error("❌ Error handling signal: %s. Releasing lock.", e, exc_info=True)
             await self._release_position_lock()
+        # ✅ --- FINALLY BLOCK REMOVED ---
+        # --- END FIX ---
+
 
     # ---------------------------
     # Core order placement
-    # ---------------------------
+    # ... (method _send_order is unchanged) ...
     async def _send_order(self, method: str, path: str, payload: dict) -> dict:
         """Helper to map order sending to the centralized API client."""
         method = method.upper()
@@ -338,7 +336,7 @@ class OrderExecutionManager:
         if status == 200:
             return data
         return {"success": False, "error": data}
-
+    # ... (method _place_linked_orders is unchanged) ...
     async def _place_linked_orders(
         self,
         symbol: str,
@@ -427,10 +425,9 @@ class OrderExecutionManager:
                 logger.info(f"🎯 Fallback Stop Loss Order Placed. ID: {sl_resp.get('result', {}).get('id')}")
 
         return product_id, direction
-
     # ---------------------------
     # Notifications
-    # ---------------------------
+    # ... (methods _notify_monitor, _notify_tsl_manager are unchanged) ...
     async def _notify_monitor(self, symbol: str, size: float, product_id: int):
         try:
             message = {

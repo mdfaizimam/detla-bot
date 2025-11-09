@@ -1,8 +1,8 @@
 # --- monitor.py ---
 # UPDATED: Refactored to use centralized DeltaAPIClient
 # UPDATED: Accepts RiskManager instance to report PnL on position close.
-# FIX: Corrected a type-hinting error by removing the unnecessary
-#      try/except block around the RiskManager import.
+# UPDATED: Imports REDIS_POSITION_LOCK_KEY and releases the
+#          lock on position close, enabling the next trade.
 
 import asyncio
 import json
@@ -10,13 +10,15 @@ import logging
 import aiohttp
 import urllib.parse
 from redis import asyncio as aioredis
-from config import DELTA_BASE_URL, API_KEY, API_SECRET, REDIS_URL, MONITORING_CHANNEL, USER_AGENT
+from config import (
+    DELTA_BASE_URL, API_KEY, API_SECRET, REDIS_URL, 
+    MONITORING_CHANNEL, USER_AGENT,
+    REDIS_POSITION_LOCK_KEY # ✅ --- FIX: Import global lock key ---
+)
 # NEW: Import the centralized client
 from utils.api_client import DeltaAPIClient
-
-# ✅ --- FIX: Import RiskManager directly as a type ---
 from risk_manager import RiskManager
-# --- END FIX ---
+
 
 logger = logging.getLogger("monitor")
 
@@ -25,15 +27,11 @@ class PositionMonitor:
     Accepts shared clients and monitors open positions.
     """
 
-    # ✅ --- FIX: Use the imported class 'RiskManager' as the type ---
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
-    # --- END FIX ---
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.redis = redis_client   
-        # UPDATED: Store the api_client
         self.api_client = api_client 
-        
         self.risk_manager = risk_manager
         
         self.is_monitoring = False
@@ -42,15 +40,14 @@ class PositionMonitor:
         
         self._created_redis = False
 
+    # ... (methods connect, close, _get_position_by_id are unchanged) ...
     async def connect(self):
         """Initialize connections"""
-        # This is now handled by main.py, which passes in clients
         pass
 
     async def close(self):
         """Cleanup resources"""
         await self.stop_monitoring() 
-        # Main.py will close the shared session and redis client
         pass
 
     async def _get_position_by_id(self, product_id: int):
@@ -60,7 +57,6 @@ class PositionMonitor:
             params = {"product_id": product_id} 
             logger.debug(f"🔍 Fetching position for product_id: {product_id}")
 
-            # UPDATED: Use the centralized API client
             status, data = await self.api_client.get(path, params=params)
 
             if status == 200:
@@ -72,7 +68,6 @@ class PositionMonitor:
         except Exception as e:
             logger.error(f"❌ Error fetching position {product_id}: {e}")
             return None 
-
 
     async def _monitoring_loop(self):
         """Main monitoring loop - runs until position closes"""
@@ -99,8 +94,8 @@ class PositionMonitor:
             await asyncio.sleep(check_interval)
 
         if not position_appeared:
-            logger.error(f"❌ Position {current_symbol} did not appear after {max_appearance_checks * check_interval}s. Assuming fill failed or was 0.")
-            await self._notify_position_closed(current_symbol, 0.0) # ✅ FIX: Send 0.0 PnL
+            logger.error(f"❌ Position {current_symbol} did not appear after {max_appearance_checks * check_interval}s. Assuming fill failed or 0.")
+            await self._notify_position_closed(current_symbol, 0.0) # Send 0.0 PnL
             await self.stop_monitoring()
             return 
 
@@ -118,7 +113,7 @@ class PositionMonitor:
                     logger.warning(f"API error checking position {current_symbol}, error {consecutive_errors}/{max_consecutive_errors}")
                     if consecutive_errors >= max_consecutive_errors:
                         logger.error("❌ Too many errors querying position, stopping monitor")
-                        await self._notify_position_closed(current_symbol, last_known_pnl) # ✅ FIX
+                        await self._notify_position_closed(current_symbol, last_known_pnl) 
                         await self.stop_monitoring() 
                         break
                     await asyncio.sleep(5)
@@ -129,13 +124,12 @@ class PositionMonitor:
 
                 if float(position.get("size", 0)) == 0:
                     logger.info(f"✅ Detected position closed for {current_symbol}")
-                    # ✅ FIX: Get the final realized PnL
                     final_pnl = float(position.get("realized_pnl", 0.0))
                     await self._notify_position_closed(current_symbol, final_pnl) 
                     await self.stop_monitoring()
                     break
 
-                await asyncio.sleep(5.0) # ✅ FIX: Poll faster (was 30s)
+                await asyncio.sleep(5.0) 
 
             except asyncio.CancelledError:
                 break
@@ -144,7 +138,7 @@ class PositionMonitor:
                 consecutive_errors += 1
                 if consecutive_errors >= max_consecutive_errors:
                     logger.error(f"❌ Too many errors, stopping monitoring for {self.current_position['symbol']}")
-                    await self._notify_position_closed(current_symbol, last_known_pnl) # ✅ FIX
+                    await self._notify_position_closed(current_symbol, last_known_pnl)
                     await self.stop_monitoring() 
                     break
                 await asyncio.sleep(20)
@@ -157,19 +151,26 @@ class PositionMonitor:
             message = {
                 "type": "position_closed",
                 "symbol": symbol,
-                "pnl": pnl, # ✅ FIX: Add the PnL to the message
+                "pnl": pnl, 
                 "timestamp": asyncio.get_event_loop().time()
             }
             await self.redis.publish(MONITORING_CHANNEL, json.dumps(message))
             logger.info(f"📢 Notified position closure: {symbol} (PnL: {pnl})")
 
-            # ✅ --- FIX: Report PnL to RiskManager ---
+            # Report PnL to RiskManager
             if self.risk_manager:
                 logger.info(f"Reporting PnL of {pnl} to RiskManager.")
-                # Use create_task to avoid blocking the monitor loop
                 asyncio.create_task(self.risk_manager.update_equity_with_pnl(pnl))
             else:
                 logger.warning("No RiskManager instance found. Cannot report PnL.")
+
+            # ✅ --- FIX: Release the global position lock ---
+            # This is the action that allows the bot to search for a new trade.
+            try:
+                await self.redis.delete(REDIS_POSITION_LOCK_KEY)
+                logger.info("🔓 Released global position lock. Bot is free to trade.")
+            except Exception as e:
+                logger.error("❌ FAILED to release global position lock: %s", e)
             # --- END FIX ---
 
         except Exception as e:
@@ -202,11 +203,26 @@ class PositionMonitor:
                     pass # Expected
         self.monitoring_task = None
         logger.info("🛑 Position monitoring stopped")
+        
+        # ✅ --- FIX: Safety net to release lock if monitor is stopped externally ---
+        try:
+            # This is a safety check. The lock *should* be released by
+            # _notify_position_closed, but if the monitor is stopped
+            # for any other reason (e.g., manual shutdown), we must
+            # release the lock to prevent the bot from being permantently stuck.
+            if await self.redis.get(REDIS_POSITION_LOCK_KEY):
+                 await self.redis.delete(REDIS_POSITION_LOCK_KEY)
+                 logger.warning("🔓 Released global position lock during monitor shutdown (safety net).")
+        except Exception as e:
+            logger.error("❌ Error releasing lock in stop_monitoring (safety net): %s", e)
+        # --- END FIX ---
+
 
     def is_active(self):
         """Check if currently monitoring a position"""
         return self.is_monitoring
 
+    # ... (start method is unchanged) ...
     async def start(self):
         """Start the monitor service (listens for monitoring requests)"""
         pubsub = self.redis.pubsub()
