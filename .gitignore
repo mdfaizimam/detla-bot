@@ -37,7 +37,6 @@ model/
 
 # Specific Python files to ignore
 fetch_stop_order_test.py
-historical_data_fetcher.py
 trailing_sl.py
 
 # IDE
