@@ -1,7 +1,5 @@
-# --- config.py ---
-# Complete Updated File (with Dynamic TSL Parameters & API Retry Config)
-# FIX: Removed hardcoded API key/secret fallbacks. Must be loaded from env.
-# FIX: Added PRIVATE_CHANNEL for event-driven monitoring
+# --- detla-bot/config.py ---
+# Complete Updated File (Phase 7: Stacking & Sentiment API)
 
 import os
 from pathlib import Path
@@ -16,13 +14,16 @@ load_dotenv()
 # ----------------------------------------------------------------------
 # ✅ Core Environment Config
 # ----------------------------------------------------------------------
-# 🔒 FIX: Removed hardcoded default ("") for security.
-# Bot will now fail on startup if these are not in the environment.
 API_KEY = os.getenv("DELTA_API_KEY")
 API_SECRET = os.getenv("DELTA_API_SECRET")
 WS_URL = "wss://socket.india.delta.exchange"
 DELTA_BASE_URL = "https://api.india.delta.exchange" 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# ----------------------------------------------------------------------
+# ✅ NEW: Public API URLs for Sentiment Data
+# ----------------------------------------------------------------------
+BINANCE_FUTURES_URL = "https://fapi.binance.com" # For Funding, OI, Liquidations
 
 # ----------------------------------------------------------------------
 # ✅ Deadman Switch Configuration 
@@ -42,39 +43,50 @@ SPOT_INDEX_SYMBOLS = {
 # ✅ Trading Symbols & Markets
 # ----------------------------------------------------------------------
 TRADING_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD"]  
+# NEW: Mapping for public data (Delta symbol -> Binance symbol)
+PUBLIC_SYMBOL_MAPPING = {
+    "BTCUSD": "BTCUSDT",
+    "ETHUSD": "ETHUSDT",
+    "SOLUSD": "SOLUSDT"
+}
 PRIORITY_LIST = ["SOLUSD", "ETHUSD", "BTCUSD"]
 
 # ----------------------------------------------------------------------
 # ✅ Risk Management Parameters
 # ----------------------------------------------------------------------
-BASE_POSITION_SIZE = 1       # Base position size in contracts (Static size: 1)
-MAX_DRAWDOWN_PERCENT = 0.15  # 15% Max Portfolio Drawdown (for RiskManager)
-MAX_DAILY_LOSS_PERCENT = 0.05 # 5% Max Daily Loss (for RiskManager)
+BASE_POSITION_SIZE = 1       
+MAX_DRAWDOWN_PERCENT = 0.15  
+MAX_DAILY_LOSS_PERCENT = 0.05 
 MAX_CONCURRENT_TRADES = 1    
-
-# ----------------------------------------------------------------------
-# ✅ GLOBAL CONSTANTS (For use in the config dictionary calculation)
-# ----------------------------------------------------------------------
-MAX_POSITION_SIZE = 0.1      # 10% max position (used for reporting)
+MAX_POSITION_SIZE = 0.1      
 
 # ----------------------------------------------------------------------
 # ✅ Smart TP/SL & R/R Parameters 
 # ----------------------------------------------------------------------
-ATR_TIMEFRAME = "5m"       # Use 5m ATR for volatility
+ATR_TIMEFRAME = "5m"       
 SL_ATR_MULTIPLIER = 2.0    
 TP_BUFFER_PCT = 0.001      
 MIN_RISK_REWARD_RATIO = 1.5 
+
+# ✅ Parameters for Dynamic Labeling and Feature Lags
+ATR_LABEL_MULTIPLIER = 1.5     # Target is 1.5 * ATR
+LAG_PERIODS = [1, 3, 5]        # Lag the most important features
+
+# ----------------------------------------------------------------------
+# ✅ NEW: Model Architecture Flag
+# ----------------------------------------------------------------------
+USE_STACKING_ENSEMBLE = True # Set to True to build the Stacking model
 
 # ----------------------------------------------------------------------
 # ✅ Trailing Stop Loss (TSL) Parameters (DYNAMIC UPDATE)
 # ----------------------------------------------------------------------
 TSL_ENABLED = True
-TSL_TRAIL_AMOUNT = 2.00    # Static fallback/Original config (used as fallback)
-TSL_CHECK_INTERVAL = 5     # Poll frequency in seconds
+TSL_TRAIL_AMOUNT = 2.00    
+TSL_CHECK_INTERVAL = 5     
 TSL_CHANNEL = "delta:tsl_control" 
 
-TSL_ATR_MULTIPLIER = 1.0     # NEW: Multiplier applied to ATR for dynamic trail distance
-TSL_MIN_TRAIL_AMOUNT = 0.5   # NEW: Minimum dollar value trail floor
+TSL_ATR_MULTIPLIER = 1.0     
+TSL_MIN_TRAIL_AMOUNT = 0.5   
 
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Parameters (Entry Signal)
@@ -86,23 +98,16 @@ SIGNAL_CONFIDENCE = 0.9
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Filters (All 4 Filters)
 # ----------------------------------------------------------------------
-# 1. Trend Filter
 TREND_CHECK_ENABLED = True
 TREND_TIMEFRAME = "1h" 
-
-# 2. Funding Rate Filter
 FUNDING_CHECK_ENABLED = True
-FUNDING_RATE_THRESHOLD = 0.0005 # 0.05%
-
-# 3. Volume Filter
+FUNDING_RATE_THRESHOLD = 0.0005 
 VOLUME_CHECK_ENABLED = True
 VOLUME_TIMEFRAME = "5m"       
 VOLUME_SMA_PERIOD = 20         
 VOLUME_SURGE_MULTIPLIER = 2.0 
-
-# 4. S/R Filter
 SNR_CHECK_ENABLED = True
-SNR_PROXIMITY_PCT = 0.002 # 0.2%
+SNR_PROXIMITY_PCT = 0.002 
 
 # ----------------------------------------------------------------------
 # ✅ Order Execution Parameters
@@ -122,8 +127,6 @@ WS_RECONNECT_MAX = 60
 WS_HEARTBEAT_INTERVAL = 30
 RATE_LIMIT_REST = 100
 RATE_LIMIT_WS = 150
-
-# API Client retry policy
 API_MAX_RETRIES = 3
 API_RETRY_DELAY = 1.0
 
@@ -131,7 +134,7 @@ API_RETRY_DELAY = 1.0
 # ✅ Redis Channels & Data Management
 # ----------------------------------------------------------------------
 RAW_CHANNEL = "delta:raw:ws"
-PRIVATE_CHANNEL = "delta:private:ws" # ✅ NEW: For private WS messages
+PRIVATE_CHANNEL = "delta:private:ws" 
 ENRICHED_CHANNEL = "delta:enriched"
 SIGNAL_CHANNEL = "delta:signals"
 EXECUTION_CHANNEL = "delta:executions"
@@ -139,12 +142,9 @@ ERROR_CHANNEL = "delta:errors"
 MONITORING_CHANNEL = "delta:monitoring"
 CONTROL_CHANNEL = "delta:control" 
 TSL_CHANNEL = "delta:tsl_control" 
-
 REDIS_POSITION_LOCK_KEY = "active_position"
-LATEST_ENRICHED_KEY = "latest:enriched:" # NEW: Redis Key Prefix for caching FE output
-# ✅ NEW: Health check key
+LATEST_ENRICHED_KEY = "latest:enriched:" 
 HEALTH_CHECK_KEY_FE = "health:fe:last_ts"
-
 REDIS_DATA_TTL = 3600
 CACHE_EXPIRY = 300
 
@@ -157,8 +157,6 @@ LOG_PATH = BASE_DIR / "logs"
 LOG_FILE = LOG_PATH / "bot.log"
 AUDIT_LOG_FILE = LOG_PATH / "audit.log"
 os.makedirs(LOG_PATH, exist_ok=True)
-
-# --- (FIX) REMOVED DUPLICATE DEFINITIONS THAT WERE HERE ---
 
 # ----------------------------------------------------------------------
 # ✅ Derived Config Object (for easy passing)
@@ -174,6 +172,11 @@ config = {
     "ATR_TIMEFRAME": ATR_TIMEFRAME,
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
+    
+    # NEW PARAMETERS
+    "ATR_LABEL_MULTIPLIER": ATR_LABEL_MULTIPLIER,
+    "LAG_PERIODS": LAG_PERIODS,
+    "USE_STACKING_ENSEMBLE": USE_STACKING_ENSEMBLE,
     
     # TSL (Dynamic & Static)
     "TSL_ENABLED": TSL_ENABLED,
@@ -225,4 +228,4 @@ print(f"🌊 Volume: {VOLUME_CHECK_ENABLED} ({VOLUME_TIMEFRAME} vol > {VOLUME_SU
 print(f"⛰️ S/R: {SNR_CHECK_ENABLED} (Avoid {SNR_PROXIMITY_PCT * 100}% proximity to Daily/Weekly/Monthly levels)")
 print(f"⚖️ R/R: Required Ratio > {MIN_RISK_REWARD_RATIO}:1")
 print(f"🎛️ Single Position Mode: Active (Max {MAX_CONCURRENT_TRADES} concurrent trade)")
-print(f"🔀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_ATR_MULTIPLIER}x ATR, Min: {TSL_MIN_TRAIL_AMOUNT} USD)")
+print(f"𔀀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_ATR_MULTIPLIER}x ATR, Min: {TSL_MIN_TRAIL_AMOUNT} USD)")
