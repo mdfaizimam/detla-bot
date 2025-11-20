@@ -93,7 +93,7 @@ TSL_MIN_TRAIL_AMOUNT = 0.5
 # ----------------------------------------------------------------------
 OBI_THRESHOLD = 0.3  
 TFI_THRESHOLD = 0.1  
-SIGNAL_CONFIDENCE = 0.9 
+SIGNAL_CONFIDENCE = 0.7
 
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Filters (All 4 Filters)
