@@ -1,5 +1,7 @@
 # --- detla-bot/config.py ---
-# Complete Updated File (Phase 7: Stacking & Sentiment API)
+# Complete Updated File (Phase 8: World Class Upgrade)
+# ✅ NEW: Mean Reversion Parameters (Trade the Chop)
+# ✅ NEW: Dynamic Confidence Parameters (Catch the Momentum)
 
 import os
 from pathlib import Path
@@ -19,15 +21,7 @@ API_SECRET = os.getenv("DELTA_API_SECRET")
 WS_URL = "wss://socket.india.delta.exchange"
 DELTA_BASE_URL = "https://api.india.delta.exchange" 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-# ----------------------------------------------------------------------
-# ✅ NEW: Public API URLs for Sentiment Data
-# ----------------------------------------------------------------------
-BINANCE_FUTURES_URL = "https://fapi.binance.com" # For Funding, OI, Liquidations
-
-# ----------------------------------------------------------------------
-# ✅ Deadman Switch Configuration 
-# ----------------------------------------------------------------------
+BINANCE_FUTURES_URL = "https://fapi.binance.com" 
 DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
 
 # ----------------------------------------------------------------------
@@ -43,7 +37,6 @@ SPOT_INDEX_SYMBOLS = {
 # ✅ Trading Symbols & Markets
 # ----------------------------------------------------------------------
 TRADING_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD"]  
-# NEW: Mapping for public data (Delta symbol -> Binance symbol)
 PUBLIC_SYMBOL_MAPPING = {
     "BTCUSD": "BTCUSDT",
     "ETHUSD": "ETHUSDT",
@@ -68,32 +61,49 @@ SL_ATR_MULTIPLIER = 2.0
 TP_BUFFER_PCT = 0.001      
 MIN_RISK_REWARD_RATIO = 1.5 
 
-# ✅ Parameters for Dynamic Labeling and Feature Lags
-ATR_LABEL_MULTIPLIER = 1.5     # Target is 1.5 * ATR
-LAG_PERIODS = [1, 3, 5]        # Lag the most important features
+# ----------------------------------------------------------------------
+# ✅ Model & Training Config
+# ----------------------------------------------------------------------
+ATR_LABEL_MULTIPLIER = 1.5     
+LAG_PERIODS = [1, 3, 5]        
+USE_STACKING_ENSEMBLE = True 
 
 # ----------------------------------------------------------------------
-# ✅ NEW: Model Architecture Flag
-# ----------------------------------------------------------------------
-USE_STACKING_ENSEMBLE = True # Set to True to build the Stacking model
-
-# ----------------------------------------------------------------------
-# ✅ Trailing Stop Loss (TSL) Parameters (DYNAMIC UPDATE)
+# ✅ Trailing Stop Loss (TSL) Parameters
 # ----------------------------------------------------------------------
 TSL_ENABLED = True
 TSL_TRAIL_AMOUNT = 2.00    
 TSL_CHECK_INTERVAL = 5     
 TSL_CHANNEL = "delta:tsl_control" 
-
 TSL_ATR_MULTIPLIER = 1.0     
 TSL_MIN_TRAIL_AMOUNT = 0.5   
+
+# ----------------------------------------------------------------------
+# ✅ NEW: Dynamic Confidence Strategy (The "Recall" Fix)
+# ----------------------------------------------------------------------
+# Instead of a static 0.9, we scale it down when volatility (Opportunity) is high.
+DYNAMIC_CONFIDENCE_ENABLED = True
+BASE_CONFIDENCE = 0.90         # Target confidence for calm markets
+MIN_CONFIDENCE = 0.65          # Floor confidence for exploding markets
+VOLATILITY_SCALER = 2.0        # How aggressively to lower confidence based on BB Width
+
+# ----------------------------------------------------------------------
+# ✅ NEW: Mean Reversion Strategy (The "Chop" Fix)
+# ----------------------------------------------------------------------
+MEAN_REVERSION_ENABLED = True
+MR_BB_LENGTH = 20              # Bollinger Band Length
+MR_BB_STD = 2.0                # Bollinger Band Deviation
+MR_RSI_OVERSOLD = 30           # Buy Zone
+MR_RSI_OVERBOUGHT = 70         # Sell Zone
+MR_KER_THRESHOLD = 0.25        # Below this = Chop Regime
+MR_RISK_REWARD = 1.2           # Lower R:R for scalps
 
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Parameters (Entry Signal)
 # ----------------------------------------------------------------------
 OBI_THRESHOLD = 0.3  
 TFI_THRESHOLD = 0.1  
-SIGNAL_CONFIDENCE = 0.7
+SIGNAL_CONFIDENCE = BASE_CONFIDENCE # Default fallback
 
 # ----------------------------------------------------------------------
 # ✅ Heuristic Strategy Filters (All 4 Filters)
@@ -121,7 +131,7 @@ BRACKET_ORDER_TYPE = "limit_order"
 # ----------------------------------------------------------------------
 # ✅ System & Connection Parameters
 # ----------------------------------------------------------------------
-USER_AGENT = "DeltaInstitutionalBot/1.0"
+USER_AGENT = "DeltaInstitutionalBot/2.0"
 WS_RECONNECT_BASE = 3
 WS_RECONNECT_MAX = 60
 WS_HEARTBEAT_INTERVAL = 30
@@ -173,11 +183,22 @@ config = {
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
     
-    # NEW PARAMETERS
+    # Training Params
     "ATR_LABEL_MULTIPLIER": ATR_LABEL_MULTIPLIER,
     "LAG_PERIODS": LAG_PERIODS,
     "USE_STACKING_ENSEMBLE": USE_STACKING_ENSEMBLE,
     
+    # Dynamic & MR Params
+    "DYNAMIC_CONFIDENCE_ENABLED": DYNAMIC_CONFIDENCE_ENABLED,
+    "BASE_CONFIDENCE": BASE_CONFIDENCE,
+    "MIN_CONFIDENCE": MIN_CONFIDENCE,
+    "VOLATILITY_SCALER": VOLATILITY_SCALER,
+    "MEAN_REVERSION_ENABLED": MEAN_REVERSION_ENABLED,
+    "MR_RSI_OVERSOLD": MR_RSI_OVERSOLD,
+    "MR_RSI_OVERBOUGHT": MR_RSI_OVERBOUGHT,
+    "MR_KER_THRESHOLD": MR_KER_THRESHOLD,
+    "MR_RISK_REWARD": MR_RISK_REWARD,
+
     # TSL (Dynamic & Static)
     "TSL_ENABLED": TSL_ENABLED,
     "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT, 
@@ -220,7 +241,7 @@ print(f"✅ Configuration loaded successfully")
 print(f"📊 Trading Symbols: {TRADING_SYMBOLS}")
 print(f"🎯 Priority List: {' -> '.join(PRIORITY_LIST)}")
 print(f"🛡️ Risk Management: {MAX_DRAWDOWN_PERCENT*100}% max drawdown, {MAX_DAILY_LOSS_PERCENT*100}% daily loss")
-print(f"🤖 Strategy: Heuristic (OBI > {OBI_THRESHOLD}, TFI > {TFI_THRESHOLD})")
+print(f"🤖 Strategy: Hybrid (ML Trend + Mean Reversion)")
 print(f"--- FILTERS ---")
 print(f"📈 Trend: {TREND_CHECK_ENABLED} on {TREND_TIMEFRAME} candle")
 print(f"💵 Funding: {FUNDING_CHECK_ENABLED} (Threshold: {FUNDING_RATE_THRESHOLD * 100}%)")
@@ -229,3 +250,4 @@ print(f"⛰️ S/R: {SNR_CHECK_ENABLED} (Avoid {SNR_PROXIMITY_PCT * 100}% proxim
 print(f"⚖️ R/R: Required Ratio > {MIN_RISK_REWARD_RATIO}:1")
 print(f"🎛️ Single Position Mode: Active (Max {MAX_CONCURRENT_TRADES} concurrent trade)")
 print(f"𔀀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_ATR_MULTIPLIER}x ATR, Min: {TSL_MIN_TRAIL_AMOUNT} USD)")
+print(f"🧠 Dynamic Confidence: Enabled (Base: {BASE_CONFIDENCE}, Min: {MIN_CONFIDENCE})")

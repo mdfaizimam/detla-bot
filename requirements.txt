@@ -1,10 +1,16 @@
-aiohttp>=3.9
-redis>=5.0
-numpy>=2.0
-pandas>=2.0
-scikit-learn>=1.4    # Added for machine learning core functionality
-xgboost>=1.7         # Added for the XGBoost model classifier
-joblib>=1.3          # Added for saving and loading the AI model
-pandas-ta-classic    # Corrected name for the TA library
+aiohttp
+aioredis
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+joblib
 python-dotenv
-aiofiles==23.2.1
+pandas_ta_classic
+ta
+shap
+# ✅ NEW: Performance & Visualization
+orjson       # Fastest JSON library (Speed Upgrade)
+streamlit    # Dashboarding
+plotly       # Interactive Charts
+watchdog     # For Streamlit auto-reload
