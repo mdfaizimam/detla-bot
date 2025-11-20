@@ -1,11 +1,13 @@
 # --- feature_engine.py ---
+# Complete Updated File
 # FIX: Replaced the 'is_priming' and 'is_processing_buffer' flags
 # with a single asyncio.Lock (_priming_lock) to create an atomic
 # "priming + buffer processing" state, fixing the race condition.
 # ✅ FIX: Replaced O(N) TFI calculation with O(1) deque-based method.
 # ✅ FIX: Added health check timestamp writing.
 # ✅ NEW: Added OBV and ADX to _calculate_technical_indicators
-# ✅ NEW: Added Kaufman Efficiency Ratio (KER) and Fractal Dimension for Regime Detection
+# ✅ NEW: Added Kaufman Efficiency Ratio (KER) and Fractal Dimension
+# ✅ NEW: Added Bollinger Bands for Mean Reversion Strategy
 
 import asyncio
 import json
@@ -89,10 +91,12 @@ class FeatureEngine:
         """Publish enriched data to Redis."""
         try:
             await self.redis.publish(ENRICHED_CHANNEL, json.dumps(payload))
-            log.info(f"📡 Published enriched → {payload.get('symbol')}: "
-                     f"OBI={payload.get('imbalance'):.4f}, " 
-                     f"TFI={payload.get('tfi'):.4f}, "
-                     f"KER={payload.get('tas', {}).get('5m', {}).get('ker', 0):.2f}")
+            # Condensed log to avoid clutter
+            tas_5m = payload.get('tas', {}).get('5m', {})
+            log.info(f"📡 Enriched {payload.get('symbol')}: "
+                     f"KER={tas_5m.get('ker', 0):.2f}, "
+                     f"BB_W={tas_5m.get('bb_width', 0):.4f}, "
+                     f"RSI={tas_5m.get('rsi_14', 0):.1f}")
         except Exception as e:
             log.error(f"❌ Failed to publish enriched event: {e}")
 
@@ -577,18 +581,15 @@ class FeatureEngine:
                 # --- END NEW ---
                 
                 # ✅ --- NEW: Regime Detection (Kaufman ER & Fractal Dimension) ---
-                # 1. Kaufman Efficiency Ratio (KER) = Change / Sum of absolute changes
-                # Measures trend efficiency (1.0 = straight line, 0.0 = random noise)
                 er_period = 10
                 change = df['close'].diff(er_period).abs()
                 volatility = df['close'].diff().abs().rolling(er_period).sum()
                 df['KER'] = change / volatility
                 
-                # 2. Fractal Dimension (Simplified via Sevcik's method or similar approximation)
-                # Here we use a simple 1D Box Counting proxy using high/low
-                # N = (High - Low) / Average Range
-                # We will use a rolling window version
-                
+                # ✅ --- NEW: Bollinger Bands (For Mean Reversion) ---
+                # Default: length=20, std=2
+                df.ta.bbands(length=20, std=2, append=True)
+
                 latest_tas = {
                     "ema_20": df['EMA_20'].iloc[-1],
                     "ema_50": df['EMA_50'].iloc[-1],
@@ -600,7 +601,12 @@ class FeatureEngine:
                     "obv": df['OBV'].iloc[-1],
                     "adx": df['ADX_14'].iloc[-1],
                     # ✅ --- NEW: Regime Features ---
-                    "ker": df['KER'].iloc[-1] if 'KER' in df.columns else 0.5
+                    "ker": df['KER'].iloc[-1] if 'KER' in df.columns else 0.5,
+                    # ✅ --- NEW: Bollinger Band Data ---
+                    "bb_lower": df['BBL_20_2.0'].iloc[-1],
+                    "bb_upper": df['BBU_20_2.0'].iloc[-1],
+                    "bb_mid": df['BBM_20_2.0'].iloc[-1],
+                    "bb_width": df['BBB_20_2.0'].iloc[-1] if 'BBB_20_2.0' in df.columns else 0.0
                 }
                 
                 # --- Volume Filter Calculation ---
