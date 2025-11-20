@@ -1,7 +1,7 @@
 # --- detla-bot/config.py ---
-# Complete Updated File (Phase 8: World Class Upgrade)
-# ✅ NEW: Mean Reversion Parameters (Trade the Chop)
-# ✅ NEW: Dynamic Confidence Parameters (Catch the Momentum)
+# COMPLETE PRODUCTION CONFIGURATION
+# ✅ Includes: Risk, Strategy, Filters, TSL, and System Settings
+# ✅ NEW: Volume Bars, Mean Reversion, Dynamic Confidence
 
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ BINANCE_FUTURES_URL = "https://fapi.binance.com"
 DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
 
 # ----------------------------------------------------------------------
-# ✅ Spot Index Symbols (For v2/spot_price WS subscription)
+# ✅ Spot Index Symbols
 # ----------------------------------------------------------------------
 SPOT_INDEX_SYMBOLS = {
     "BTCUSD": ".DEXBTUSD",
@@ -79,34 +79,43 @@ TSL_ATR_MULTIPLIER = 1.0
 TSL_MIN_TRAIL_AMOUNT = 0.5   
 
 # ----------------------------------------------------------------------
-# ✅ NEW: Dynamic Confidence Strategy (The "Recall" Fix)
+# ✅ Dynamic Confidence Strategy (The "Recall" Fix)
 # ----------------------------------------------------------------------
-# Instead of a static 0.9, we scale it down when volatility (Opportunity) is high.
 DYNAMIC_CONFIDENCE_ENABLED = True
 BASE_CONFIDENCE = 0.90         # Target confidence for calm markets
 MIN_CONFIDENCE = 0.65          # Floor confidence for exploding markets
-VOLATILITY_SCALER = 2.0        # How aggressively to lower confidence based on BB Width
+VOLATILITY_SCALER = 2.0        # How aggressively to lower confidence
 
 # ----------------------------------------------------------------------
-# ✅ NEW: Mean Reversion Strategy (The "Chop" Fix)
+# ✅ Mean Reversion Strategy (The "Chop" Fix)
 # ----------------------------------------------------------------------
 MEAN_REVERSION_ENABLED = True
-MR_BB_LENGTH = 20              # Bollinger Band Length
-MR_BB_STD = 2.0                # Bollinger Band Deviation
-MR_RSI_OVERSOLD = 30           # Buy Zone
-MR_RSI_OVERBOUGHT = 70         # Sell Zone
-MR_KER_THRESHOLD = 0.25        # Below this = Chop Regime
-MR_RISK_REWARD = 1.2           # Lower R:R for scalps
+MR_BB_LENGTH = 20              
+MR_BB_STD = 2.0                
+MR_RSI_OVERSOLD = 30           
+MR_RSI_OVERBOUGHT = 70         
+MR_KER_THRESHOLD = 0.25        
+MR_RISK_REWARD = 1.2           
 
 # ----------------------------------------------------------------------
-# ✅ Heuristic Strategy Parameters (Entry Signal)
+# ✅ Data Granularity (Volume Bars)
+# ----------------------------------------------------------------------
+VOLUME_BAR_SIZE = {
+    "BTCUSD": 5.0,    # Generate bar every 5 BTC traded
+    "ETHUSD": 50.0,   # Generate bar every 50 ETH traded
+    "SOLUSD": 500.0   # Generate bar every 500 SOL traded
+}
+VOLUME_BAR_CHANNEL = "delta:volume_bars"
+
+# ----------------------------------------------------------------------
+# ✅ Heuristic Strategy Parameters
 # ----------------------------------------------------------------------
 OBI_THRESHOLD = 0.3  
 TFI_THRESHOLD = 0.1  
 SIGNAL_CONFIDENCE = BASE_CONFIDENCE # Default fallback
 
 # ----------------------------------------------------------------------
-# ✅ Heuristic Strategy Filters (All 4 Filters)
+# ✅ Strategy Filters (All 4 Filters)
 # ----------------------------------------------------------------------
 TREND_CHECK_ENABLED = True
 TREND_TIMEFRAME = "1h" 
@@ -169,16 +178,11 @@ AUDIT_LOG_FILE = LOG_PATH / "audit.log"
 os.makedirs(LOG_PATH, exist_ok=True)
 
 # ----------------------------------------------------------------------
-# ✅ Derived Config Object (for easy passing)
+# ✅ Derived Config Object
 # ----------------------------------------------------------------------
 config = {
-    # Risk
-    "max_position_pct": MAX_POSITION_SIZE * 100,
     "BASE_POSITION_SIZE": BASE_POSITION_SIZE,
     "MIN_RISK_REWARD_RATIO": MIN_RISK_REWARD_RATIO,
-    "PRODUCT_SPECS": {}, 
-
-    # Smart TP/SL
     "ATR_TIMEFRAME": ATR_TIMEFRAME,
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
@@ -198,6 +202,7 @@ config = {
     "MR_RSI_OVERBOUGHT": MR_RSI_OVERBOUGHT,
     "MR_KER_THRESHOLD": MR_KER_THRESHOLD,
     "MR_RISK_REWARD": MR_RISK_REWARD,
+    "VOLUME_BAR_SIZE": VOLUME_BAR_SIZE,
 
     # TSL (Dynamic & Static)
     "TSL_ENABLED": TSL_ENABLED,
@@ -226,7 +231,6 @@ config = {
     # Execution Params
     "BRACKET_STOP_TRIGGER": BRACKET_STOP_TRIGGER,
     "USER_AGENT": USER_AGENT,
-    
     "LOG_LEVEL": LOG_LEVEL, 
     
     # API Client Config
