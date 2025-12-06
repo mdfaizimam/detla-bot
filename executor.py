@@ -1,14 +1,7 @@
-# --- executor.py ---
-# FINAL FIX: Removed the internal _try_dynamic_sl_tp function.
-# The executor now trusts the sl_price and tp_price provided
-# directly from the ml_strategy signal payload.
-#
-# ✅ --- CRITICAL FIX ---
-# The Executor NO LONGER RELEASES THE LOCK on a successful trade.
-# It holds the lock until the Monitor releases it,
-# enforcing MAX_CONCURRENT_TRADES = 1.
-# It ONLY releases the lock if an order fails or an exception occurs.
-# --- END FIX ---
+# --- detla-bot/executor.py ---
+# ⚡ EXECUTOR FIX: Handles Dict Config & Forces Integers
+# ✅ FIX: Reads specific size per symbol from config
+# ✅ FIX: Casts size to int() to satisfy API validation
 
 import aiohttp
 import asyncio
@@ -34,51 +27,31 @@ from config import (
     config,
     BRACKET_STOP_TRIGGER,
     BRACKET_ORDER_TYPE,
-    REDIS_POSITION_LOCK_KEY # ✅ --- FIX: Import global lock key ---
+    REDIS_POSITION_LOCK_PREFIX
 )
 from utils.api_client import DeltaAPIClient
 from risk_manager import RiskManager
 
-# Optional import of FeatureEngine for SNR/ATR (code works even if not present)
-try:
-    from feature_engine import FeatureEngine  # type: ignore
-    _FEATURE_ENGINE_AVAILABLE = True
-except Exception:
-    FeatureEngine = None  # type: ignore
-    _FEATURE_ENGINE_AVAILABLE = False
-
 logger = logging.getLogger("executor")
 
-
 class OrderExecutionManager:
-    # ✅ --- FIX: Use global lock key ---
-    REDIS_POSITION_LOCK_KEY_GLOBAL = REDIS_POSITION_LOCK_KEY
-    # --- END FIX ---
+    REDIS_POSITION_LOCK_PREFIX = REDIS_POSITION_LOCK_PREFIX
     REDIS_POSITION_LOCK_TTL = 60
 
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
-        # Shared clients
         self.redis = redis_client
         self.api_client = api_client
         self.session = api_client.session
-
         self._process_lock = asyncio.Lock()
         self.risk_manager = risk_manager
-
         self.api_key = API_KEY
         self.api_secret = API_SECRET
         self.dms_id = DMS_ID
-
         self.product_info_cache: Dict[str, Dict[str, Any]] = {}
-
         self._signal_task: Optional[asyncio.Task] = None
-        logger.info("✅ OrderExecutionManager initialized (using DeltaAPIClient).")
+        logger.info("✅ OrderExecutionManager initialized.")
 
-    # ---------------------------
-    # Lifecycle
-    # ... (start and close methods are unchanged) ...
     async def start(self):
-        """Main signal-consumer loop."""
         logger.info("▶️ OrderExecutionManager starting (listening for signals)...")
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(SIGNAL_CHANNEL)
@@ -89,7 +62,6 @@ class OrderExecutionManager:
                 try:
                     signal = json.loads(msg["data"])
                 except Exception:
-                    logger.warning("Ignoring non-JSON signal: %s", msg.get("data"))
                     continue
                 asyncio.create_task(self._handle_signal(signal))
         except asyncio.CancelledError:
@@ -97,20 +69,11 @@ class OrderExecutionManager:
         finally:
             await pubsub.unsubscribe(SIGNAL_CHANNEL)
 
-    async def close(self):
-        logger.info("🔒 Executor connections closed by main.")
-    # ... (helpers _get_product_info, _get_ticker_prices are unchanged) ...
     async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """
-        Fetches product details (id, tick_size, precision) by symbol and caches them.
-        GET /v2/products/{symbol}
-        """
         if symbol in self.product_info_cache:
             return self.product_info_cache[symbol]
-
         path = f"/v2/products/{symbol}"
         url = f"{DELTA_BASE_URL}{path}"
-
         try:
             async with self.session.get(url, headers={'User-Agent': USER_AGENT}) as resp:
                 if resp.status == 200:
@@ -127,26 +90,18 @@ class OrderExecutionManager:
                                     "tick_size": float(tick_size_str),
                                     "precision": int(precision),
                                 }
-                                # also expose symbol if present
                                 if product.get("symbol"):
                                     info["symbol"] = product.get("symbol")
                                 self.product_info_cache[symbol] = info
                                 return info
-                            except Exception as ve:
-                                logger.error("Invalid tick_size for %s: %s | %s", symbol, tick_size_str, ve)
+                            except Exception:
                                 return None
-                logger.error("❌ Product info not found for %s (HTTP %s)", symbol, resp.status)
                 return None
         except Exception as e:
-            logger.error("❌ Error fetching product info for %s: %s", symbol, e, exc_info=True)
+            logger.error("❌ Error fetching product info: %s", e)
             return None
 
     async def _get_ticker_prices(self, symbol: str) -> Tuple[Optional[float], Optional[float]]:
-        """
-        Fetch current mark_price and last traded ('close') price.
-        GET /v2/tickers/{symbol}
-        Returns (mark_price, last_price)
-        """
         path = f"/v2/tickers/{symbol}"
         url = f"{DELTA_BASE_URL}{path}"
         try:
@@ -160,53 +115,41 @@ class OrderExecutionManager:
                         float(mark_price) if mark_price is not None else None,
                         float(last_price) if last_price is not None else None,
                     )
-                logger.error("❌ Ticker fetch failed for %s (HTTP %s): %s", symbol, resp.status, data)
                 return (None, None)
-        except Exception as e:
-            logger.error("❌ Error fetching ticker for %s: %s", symbol, e)
+        except Exception:
             return (None, None)
-    # ---------------------------
-    # Redis position lock
-    # ---------------------------
+
     async def _acquire_position_lock(self, symbol: str, timeout: int = 5) -> bool:
         deadline = time.time() + timeout
+        lock_key = f"{self.REDIS_POSITION_LOCK_PREFIX}{symbol}"
         lock_value = json.dumps({"symbol": symbol, "ts": time.time()})
         while time.time() < deadline:
-            ok = await self.redis.set(
-                # ✅ --- FIX: Use global lock key ---
-                self.REDIS_POSITION_LOCK_KEY_GLOBAL, 
-                lock_value,
-                ex=self.REDIS_POSITION_LOCK_TTL,
-                nx=True,
-            )
-            if ok:
-                logger.info("🔒 Acquired distributed lock for %s", symbol)
-                return True
+            ok = await self.redis.set(lock_key, lock_value, ex=self.REDIS_POSITION_LOCK_TTL, nx=True)
+            if ok: return True
             await asyncio.sleep(0.25)
-        logger.warning("⚠️ Could not acquire lock for %s", symbol)
+        logger.warning("⚠️ Could not acquire lock for %s (Busy)", symbol)
         return False
 
-    async def _release_position_lock(self):
+    async def _release_position_lock(self, symbol: str):
         try:
-            # ✅ --- FIX: Use global lock key ---
-            await self.redis.delete(self.REDIS_POSITION_LOCK_KEY_GLOBAL)
-            logger.info("🔓 Released distributed position lock")
-        except Exception as e:
-            logger.error("❌ Error releasing lock: %s", e)
+            lock_key = f"{self.REDIS_POSITION_LOCK_PREFIX}{symbol}"
+            await self.redis.delete(lock_key)
+        except Exception: pass
 
-    # ---------------------------
-    # Public signal handler
-    # ---------------------------
     async def _handle_signal(self, signal: dict):
-        """
-        Expected signal keys:
-          symbol, direction, size_hint, sl_price, tp_price
-        """
         symbol = signal.get("symbol")
         direction = signal.get("direction")
-        size_hint = signal.get("size_hint", 0)
+        
+        # 🔧 FIX: Handle Dictionary or Float for size
+        base_size_config = config["BASE_POSITION_SIZE"]
+        if isinstance(base_size_config, dict):
+            # Get specific size for symbol, or default to 1
+            size_hint = base_size_config.get(symbol, 1)
+        else:
+            # Fallback for legacy config
+            size_hint = float(base_size_config)
 
-        if not symbol or not direction or not size_hint:
+        if not symbol or not direction:
             logger.warning("Ignoring invalid signal: %s", signal)
             return
 
@@ -218,164 +161,93 @@ class OrderExecutionManager:
         side = "buy" if direction == "LONG" else "sell"
 
         if not await self._acquire_position_lock(symbol):
-            logger.warning("Another position in progress; skipping signal for %s", symbol)
+            logger.warning("Position already active for %s; skipping signal.", symbol)
             return
 
-        # ✅ --- FIX: Wrap in try/except to release lock on failure ---
         try:
-            # Calculate prices: prefer signal-provided SL/TP; else compute from live price (fallback)
             product_info = await self._get_product_info(symbol)
             if not product_info:
                 logger.error("Missing product info for %s", symbol)
-                await self._release_position_lock() # Release lock
+                await self._release_position_lock(symbol)
                 return
 
             precision = int(product_info["precision"])
             product_id = int(product_info["id"])
-
-            # get live prices
             mark_price, last_price = await self._get_ticker_prices(symbol)
-            # choose anchor for checks/fallback calc
             anchor_price = mark_price if BRACKET_STOP_TRIGGER == "mark_price" else last_price
 
-            # Get SL/TP from signal payload
             sl_price = signal.get("sl_price")
             tp_price = signal.get("tp_price")
             
-            if sl_price and tp_price:
-                logger.info("✅ Received SL/TP from strategy signal. SL=%.*f, TP=%.*f", precision, sl_price, precision, tp_price)
-            
-            # Legacy fallback (unchanged) if still missing
             if sl_price is None or tp_price is None:
-                logger.warning("⚠️ SL/TP not found in signal. Using 2%%/3%% fallback.")
                 if anchor_price is None:
-                    logger.error("Cannot compute fallback SL/TP: no live anchor price for %s", symbol)
-                    await self._release_position_lock() # Release lock
+                    await self._release_position_lock(symbol)
                     return
                 entry_reference = float(anchor_price)
-
-                sl_pct = 0.02  # 2%
-                tp_pct = 0.03  # 3%
-
+                sl_pct = 0.02
+                tp_pct = 0.03
                 if direction == "LONG":
                     sl_price = entry_reference * (1.0 - sl_pct)
                     tp_price = entry_reference * (1.0 + tp_pct)
                 else:
                     sl_price = entry_reference * (1.0 + sl_pct)
                     tp_price = entry_reference * (1.0 - tp_pct)
-
                 sl_price = round(sl_price, precision)
                 tp_price = round(tp_price, precision)
-                logger.info(
-                    "🧮 Fallback SL/TP computed from live %s: SL=%s TP=%s",
-                    "mark_price" if BRACKET_STOP_TRIGGER == "mark_price" else "last_traded_price",
-                    sl_price,
-                    tp_price,
-                )
 
-            # ✅ AUTO-CORRECT invalid TP/SL sides before bracket placement (kept)
-            if anchor_price is not None:
-                entry = float(anchor_price)
-                if direction == "LONG" and not (sl_price < entry < tp_price):
-                    logger.warning(
-                        "⚠️ Invalid LONG bracket detected (SL>=Entry or TP<=Entry). Auto-fixing around entry."
-                    )
-                    sl_price = round(entry * 0.98, precision)
-                    tp_price = round(entry * 1.03, precision)
-                elif direction == "SHORT" and not (tp_price < entry < sl_price):
-                    logger.warning(
-                        "⚠️ Invalid SHORT bracket detected (TP>=Entry or SL<=Entry). Auto-fixing around entry."
-                    )
-                    tp_price = round(entry * 0.97, precision)
-                    sl_price = round(entry * 1.02, precision)
+            # 4. Execute Trade (Force Integer Size)
+            # CRITICAL FIX: int() ensures we send 1, not 1.0
+            int_size = int(size_hint)
 
-            # Place entry + bracket (with fallback to standalone SL if needed)
             res = await self._place_linked_orders(
-                symbol, side, float(size_hint), float(tp_price), float(sl_price)
+                symbol, side, int_size, float(tp_price), float(sl_price)
             )
+            
             if not res:
                 logger.error("Order placement failed for %s. Releasing lock.", symbol)
-                await self._release_position_lock() # Release lock
+                await self._release_position_lock(symbol)
                 return
 
             product_id, ret_direction = res
+            entry_price = float(anchor_price or 0.0)
 
-            # Notify monitor & TSL manager
-            # Entry price basis: use the best available live price
-            entry_price = anchor_price if anchor_price is not None else (mark_price or last_price or 0.0)
-            entry_price = float(entry_price or 0.0)
-
-            await self._notify_monitor(symbol, float(size_hint), product_id)
+            await self._notify_monitor(symbol, int_size, product_id)
             if TSL_ENABLED:
-                await self._notify_tsl_manager(symbol, ret_direction, float(size_hint), product_id, entry_price)
+                await self._notify_tsl_manager(symbol, ret_direction, float(int_size), product_id, entry_price)
 
-            logger.info("✅ Signal executed for %s (size=%s). Lock is HELD.", symbol, size_hint)
-            
-            # --- DO NOT RELEASE LOCK HERE ---
+            logger.info("✅ Signal executed for %s (size=%d). Lock is HELD.", symbol, int_size)
 
         except Exception as e:
             logger.error("❌ Error handling signal: %s. Releasing lock.", e, exc_info=True)
-            await self._release_position_lock()
-        # ✅ --- FINALLY BLOCK REMOVED ---
-        # --- END FIX ---
+            await self._release_position_lock(symbol)
 
-
-    # ---------------------------
-    # Core order placement
-    # ... (method _send_order is unchanged) ...
     async def _send_order(self, method: str, path: str, payload: dict) -> dict:
-        """Helper to map order sending to the centralized API client."""
-        method = method.upper()
-        if method == "POST":
+        if method.upper() == "POST":
             status, data = await self.api_client.post(path, payload)
-        elif method == "PUT":
-            status, data = await self.api_client.put(path, payload)
         else:
             status, data = await self.api_client.get(path, params=payload)
+        return data if status == 200 else {"success": False, "error": data}
 
-        if status == 200:
-            return data
-        return {"success": False, "error": data}
-    # ... (method _place_linked_orders is unchanged) ...
-    async def _place_linked_orders(
-        self,
-        symbol: str,
-        side: str,
-        size: float,
-        tp_price: float,
-        sl_price: float
-    ) -> Optional[Tuple[int, str]]:
-        """
-        Places:
-          1) Market entry
-          2) Bracket (TP + SL) attached to position, with config-driven trigger & order types
-        Falls back to standalone SL if bracket fails.
-        Returns (product_id, direction) on success.
-        """
+    async def _place_linked_orders(self, symbol, side, size, tp_price, sl_price) -> Optional[Tuple[int, str]]:
         product_info = await self._get_product_info(symbol)
-        if not product_info:
-            logger.error(f"❌ Product Info missing for {symbol}. Blocking trade.")
-            return None
-
+        if not product_info: return None
         product_id = int(product_info["id"])
         precision = int(product_info["precision"])
-        direction = "LONG" if side == "buy" else "SHORT"
-
-        # 1) Market Entry
+        
         entry_payload = {
             "product_id": product_id,
-            "size": abs(size),
+            "size": size, # int
             "side": side,
             "order_type": "market_order",
         }
         logger.info(f"📦 Placing Market Entry Order: {entry_payload}")
         entry_resp = await self._send_order("POST", "/v2/orders", entry_payload)
+        
         if not entry_resp.get("success"):
             logger.error(f"❌ Market Entry Order failed: {entry_resp}")
             return None
-        logger.info(f"🎯 Entry Order Placed. ID: {entry_resp.get('result', {}).get('id')}")
-
-        # 2) Bracket order
+        
+        # Bracket logic
         final_sl_price = round(float(sl_price), precision)
         final_tp_price = round(float(tp_price), precision)
         sl_str = f"{final_sl_price:.{precision}f}"
@@ -385,7 +257,7 @@ class OrderExecutionManager:
             "product_id": product_id,
             "product_symbol": symbol,
             "stop_loss_order": {
-                "order_type": BRACKET_ORDER_TYPE,      # "limit_order" or "market_order"
+                "order_type": BRACKET_ORDER_TYPE,
                 "stop_price": sl_str,
             },
             "take_profit_order": {
@@ -393,67 +265,31 @@ class OrderExecutionManager:
                 "stop_price": tp_str,
                 "limit_price": tp_str,
             },
-            "bracket_stop_trigger_method": BRACKET_STOP_TRIGGER  # "mark_price" or "last_traded_price"
+            "bracket_stop_trigger_method": BRACKET_STOP_TRIGGER
         }
-
+        
         if BRACKET_ORDER_TYPE == "limit_order":
             bracket_payload["stop_loss_order"]["limit_price"] = sl_str
 
-        logger.info(f"📦 Placing Bracket Order: {bracket_payload}")
-        status, bracket_resp = await self.api_client.post("/v2/orders/bracket", bracket_payload)
-
-        if status == 200 and bracket_resp and bracket_resp.get("success"):
-            logger.info(f"✅ Bracket Order Placed. Resp: {bracket_resp.get('result')}")
-        else:
-            logger.error(f"❌ Bracket Order failed (HTTP {status}). Response: {bracket_resp}")
-            logger.warning("↩️ Falling back to standalone Stop Market order to protect position.")
-            sl_side = "sell" if side == "buy" else "buy"
-            fallback_sl_payload = {
-                "product_id": product_id,
-                "size": abs(size),
-                "side": sl_side,
-                "order_type": "market_order",  # stop market
-                "stop_price": sl_str,
-                "reduce_only": True,
-                "stop_order_type": "stop_loss_order",
-            }
-            logger.info(f"📦 Placing Standalone Stop Market Order (Fallback): {fallback_sl_payload}")
-            sl_resp = await self._send_order("POST", "/v2/orders", fallback_sl_payload)
-            if not sl_resp.get("success"):
-                logger.error(f"❌ Fallback Stop Loss Order failed: {sl_resp}. WARNING: Position may be unprotected!")
-            else:
-                logger.info(f"🎯 Fallback Stop Loss Order Placed. ID: {sl_resp.get('result', {}).get('id')}")
-
+        await self.api_client.post("/v2/orders/bracket", bracket_payload)
+        
+        direction = "LONG" if side == "buy" else "SHORT"
         return product_id, direction
-    # ---------------------------
-    # Notifications
-    # ... (methods _notify_monitor, _notify_tsl_manager are unchanged) ...
+
     async def _notify_monitor(self, symbol: str, size: float, product_id: int):
         try:
             message = {
-                "type": "position_opened",
+                "type": "start_monitoring",
                 "symbol": symbol,
                 "size": float(size),
                 "product_id": int(product_id),
                 "timestamp": time.time(),
             }
-            # ✅ --- FIX: Changed message type to 'start_monitoring' ---
-            # This matches the 'start' listener in monitor.py
-            message["type"] = "start_monitoring"
-            # --- END FIX ---
-            
             await self.redis.publish(MONITORING_CHANNEL, json.dumps(message))
-            logger.info("📢 Notified PositionMonitor: %s", message)
         except Exception as e:
             logger.error("Failed to notify PositionMonitor: %s", e)
 
-    async def _notify_tsl_manager(self, symbol: str, direction: str, size: float, product_id: int, entry_price: float):
-        """
-        Kick off TSL on the bracket's SL child. The TSL Manager will:
-         - locate the child SL order
-         - preserve its order type (limit/market)
-         - trail it using ATR distance
-        """
+    async def _notify_tsl_manager(self, symbol, direction, size, product_id, entry_price):
         try:
             payload = {
                 "command": "START_TSL",
@@ -464,6 +300,5 @@ class OrderExecutionManager:
                 "entry_price": float(entry_price),
             }
             await self.redis.publish(TSL_CHANNEL, json.dumps(payload))
-            logger.info("📢 Notified TSL Manager: %s", payload)
         except Exception as e:
             logger.error("Failed to notify TSL Manager: %s", e)

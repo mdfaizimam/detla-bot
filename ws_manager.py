@@ -1,22 +1,22 @@
-# --- ws_manager.py ---
-# FIX: Changed 'authenticate' to use the new synchronous signing function
-# which returns the full payload.
-# FIX: Added routing for private messages to PRIVATE_CHANNEL
+# --- detla-bot/ws_manager.py ---
+# ✅ FIX: Added Artificial Heartbeat Loop to prevent Redis Idle Timeout (Error 10054)
+# ✅ FIX: Publishes dummy traffic to RAW_CHANNEL every 10s
 
 import asyncio
 import json
 import logging
+import time
 import aiohttp
 import redis.asyncio as aioredis
 from config import (
     WS_URL, 
     RAW_CHANNEL, 
-    PRIVATE_CHANNEL, # ✅ NEW: Import private channel
+    PRIVATE_CHANNEL, 
     TRADING_SYMBOLS, 
     USER_AGENT, 
     SPOT_INDEX_SYMBOLS, 
     CONTROL_CHANNEL,
-    API_KEY,  # Import credentials
+    API_KEY,  
     API_SECRET
 )
 from utils.signing import generate_ws_keyauth_signature_for_live
@@ -35,13 +35,15 @@ class WebSocketManager:
         self.ws = None
         self.is_authenticated = False
         self._stop_flag = False
+        
+        # Keepalive Task
+        self._keepalive_task = None 
 
         # Reconnect policy
         self.reconnect_delay = 3
         self.reconnect_max = 60
         self.backoff_factor = 2
         
-        # ✅ NEW: Define which messages are private
         self.PRIVATE_CHANNELS = {
             "v2/user_trades", 
             "orders", 
@@ -76,22 +78,34 @@ class WebSocketManager:
             if self.is_authenticated:
                 return
             
-            # --- FIX START ---
-            # 1. Call the synchronous function (no 'await')
-            # 2. This function now returns the complete JSON payload dictionary
             auth_payload = generate_ws_keyauth_signature_for_live(API_KEY, API_SECRET)
-            # --- FIX END ---
-            
-            await self.ws.send_json(auth_payload) # Send the dictionary directly
+            await self.ws.send_json(auth_payload) 
             logger.info("🔐 Sent authentication payload to WebSocket")
         except Exception as e:
             logger.error(f"❌ Authentication error: {e}", exc_info=True)
 
+    # ✅ NEW: Artificial Heartbeat Generator
+    async def _keepalive_loop(self):
+        """Sends a dummy message to Redis every 10s to prevent TCP Idle Timeout."""
+        logger.info("💓 Artificial Redis Heartbeat generator started.")
+        while not self._stop_flag:
+            try:
+                # Send a small dummy payload
+                payload = {
+                    "type": "synthetic_heartbeat",
+                    "timestamp": time.time()
+                }
+                # Publish to RAW_CHANNEL so FeatureEngine stays awake reading it
+                await self.redis.publish(RAW_CHANNEL, json.dumps(payload))
+                await asyncio.sleep(10) # Pulse every 10 seconds
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"Heartbeat error (harmless): {e}")
+                await asyncio.sleep(10)
+
     async def _handle_control_messages(self):
-        """
-        Listens to the internal control channel for commands 
-        like RESUBSCRIBE_L2 from the FeatureEngine.
-        """
+        """Listens to the internal control channel."""
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(CONTROL_CHANNEL)
         logger.info(f"👂 Listening to internal control channel: {CONTROL_CHANNEL}")
@@ -114,49 +128,36 @@ class WebSocketManager:
             logger.info("Control message handler cancelled.")
 
     async def _resubscribe_l2_updates(self, symbol: str):
-        """Sends an UNsubscribe then a SUBscribe for the L2 channel to force a new snapshot."""
         if self.ws is None or self.ws.closed:
             logger.error("Cannot resubscribe: WebSocket is closed.")
             return
 
-        # 1. Unsubscribe
         unsubscribe_payload = {
             "type": "unsubscribe",
             "payload": {"channels": [{"name": "l2_updates", "symbols": [symbol]}]},
         }
         await self.ws.send_str(json.dumps(unsubscribe_payload))
-        logger.info(f"➡️ Sent unsubscribe for l2_updates:{symbol}")
-        await asyncio.sleep(0.5) # Give the server time to process
+        await asyncio.sleep(0.5) 
         
-        # 2. Resubscribe
         subscribe_payload = {
             "type": "subscribe",
             "payload": {"channels": [{"name": "l2_updates", "symbols": [symbol]}]},
         }
         await self.ws.send_str(json.dumps(subscribe_payload))
-        logger.info(f"⬅️ Sent resubscribe for l2_updates:{symbol}. Waiting for fresh snapshot...")
+        logger.info(f"⬅️ Sent resubscribe for l2_updates:{symbol}")
 
     async def subscribe_public_channels(self):
-        """Subscribe to all public market data streams."""
-        
         standard_symbols = TRADING_SYMBOLS
         mark_price_symbols = [f"MARK:{symbol}" for symbol in standard_symbols]
-        
         spot_symbols = [SPOT_INDEX_SYMBOLS[s] for s in standard_symbols if s in SPOT_INDEX_SYMBOLS]
-        
         candle_resolutions = ["1m", "5m", "15m", "1h", "4h", "1d"]
         
         channels_payload = [
-            # --- Core Analysis Streams ---
             {"name": "v2/ticker", "symbols": standard_symbols},
             {"name": "l2_updates", "symbols": standard_symbols},
             {"name": "all_trades", "symbols": standard_symbols},
-            
-            # --- Context & Risk Streams ---
             {"name": "funding_rate", "symbols": standard_symbols},
             {"name": "mark_price", "symbols": mark_price_symbols},
-            
-            # Spot Index Prices
             {"name": "v2/spot_price", "symbols": spot_symbols}
         ]
         
@@ -168,23 +169,16 @@ class WebSocketManager:
 
         payload = {
             "type": "subscribe",
-            "payload": {
-                "channels": channels_payload
-            },
+            "payload": {"channels": channels_payload},
         }
         
         try:
             await self.ws.send_str(json.dumps(payload))
-            
-            subscribed_channels = [ch['name'] for ch in channels_payload]
-            logger.info(f"📈 Subscribed to {len(subscribed_channels)} channels for {TRADING_SYMBOLS}")
-            logger.debug(f"Subscribed to: {subscribed_channels}")
-            
+            logger.info(f"📈 Subscribed to channels for {TRADING_SYMBOLS}")
         except Exception as e:
             logger.error(f"❌ Failed to subscribe to public channels: {e}")
 
     async def subscribe_private_channels(self):
-        """Subscribe to private user data channels."""
         payload = {
             "type": "subscribe", 
             "payload": {
@@ -198,16 +192,16 @@ class WebSocketManager:
         }
         try:
             await self.ws.send_str(json.dumps(payload))
-            logger.info("🧠 Subscribed to private channels (orders, positions, v2/user_trades, margins)")
+            logger.info("🧠 Subscribed to private channels")
         except Exception as e:
             logger.error(f"❌ Failed to subscribe to private channels: {e}")
 
     async def start(self):
-        """Main message loop — receives and republishes to Redis."""
         await self.connect()
         
-        # Start the control message listener concurrently
         control_task = asyncio.create_task(self._handle_control_messages())
+        # ✅ Start the heartbeat loop
+        self._keepalive_task = asyncio.create_task(self._keepalive_loop())
         
         try:
             while not self._stop_flag:
@@ -222,36 +216,28 @@ class WebSocketManager:
                     try:
                         data = json.loads(msg.data)
                     except json.JSONDecodeError:
-                        logger.warning(f"⚠️ Received malformed WS message: {msg.data[:100]}")
                         continue
 
                     msg_type = data.get("type", "unknown")
 
-                    # Reduce log noise
-                    if msg_type not in ("subscriptions", "ping", "pong", "heartbeat", "l2_updates", "all_trades", "mark_price"):
-                        logger.info(f"🛰️ WS Message: {msg_type}")
+                    if msg_type in ("subscriptions", "key-auth"):
+                        if msg_type == "key-auth" and data.get("success"):
+                            self.is_authenticated = True
+                            logger.info("✅ Authenticated successfully")
+                            await self.subscribe_private_channels()
+                        elif msg_type == "key-auth" and not data.get("success"):
+                            logger.error(f"❌ Authentication Failed: {data.get('message')}")
+                    elif msg_type not in ("ping", "pong", "heartbeat"):
+                         logger.debug(f"🛰️ WS Message: {msg_type}")
 
-                    if msg_type == "key-auth" and data.get("success"):
-                        self.is_authenticated = True
-                        logger.info("✅ Authenticated successfully")
-                        await self.subscribe_private_channels()
-                        continue
-                    
-                    if msg_type == "key-auth" and not data.get("success"):
-                        logger.error(f"❌ Authentication Failed: {data.get('message', 'Unknown error')}")
-                        continue
-                    
                     if msg_type == "heartbeat":
                          continue
 
                     try:
-                        # ✅ --- FIX: Route messages to correct channel ---
                         if msg_type in self.PRIVATE_CHANNELS:
                             await self.redis.publish(PRIVATE_CHANNEL, json.dumps(data))
                         elif msg_type not in ("subscriptions", "key-auth"):
                             await self.redis.publish(RAW_CHANNEL, json.dumps(data))
-                        # --- END FIX ---
-                            
                     except Exception as e:
                         logger.error(f"❌ Redis publish failed: {e}")
 
@@ -268,28 +254,21 @@ class WebSocketManager:
                 asyncio.create_task(self.schedule_reconnect())
         finally:
             control_task.cancel()
+            if self._keepalive_task: self._keepalive_task.cancel()
             await self.close()
 
     async def schedule_reconnect(self):
-        """Handle reconnection with exponential backoff."""
-        if self._stop_flag:
-            return
-        
+        if self._stop_flag: return
         self.is_authenticated = False
-        if self.ws and not self.ws.closed:
-            await self.ws.close()
-            
+        if self.ws and not self.ws.closed: await self.ws.close()
         logger.warning(f"🔁 Attempting reconnect in {self.reconnect_delay}s...")
         await asyncio.sleep(self.reconnect_delay)
         self.reconnect_delay = min(self.reconnect_delay * self.backoff_factor, self.reconnect_max)
-
-        if not self._stop_flag:
-            await self.connect()
+        if not self._stop_flag: await self.connect()
 
     async def close(self):
-        """Gracefully close all resources."""
         self._stop_flag = True
+        if self._keepalive_task: self._keepalive_task.cancel()
         logger.info("🔻 Closing WebSocketManager...")
-        if self.ws and not self.ws.closed:
-            await self.ws.close()
+        if self.ws and not self.ws.closed: await self.ws.close()
         logger.info("🔻 WebSocketManager closed cleanly.")

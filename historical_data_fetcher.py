@@ -1,4 +1,6 @@
-# --- historical_data_fetcher.py (FIXED VERSION) ---
+# --- detla-bot/historical_data_fetcher.py ---
+# FIXED: clean_and_save_candles_async now dedupes by ["time", "symbol"]
+#        Prevents deleting ETH/SOL data that shares timestamps with BTC.
 
 import asyncio
 import aiohttp
@@ -638,14 +640,16 @@ async def fetch_sentiment_data(session: aiohttp.ClientSession, symbols: List[str
     return funding_df, ls_df
 
 # ----------------------------------------------------------------------
-# Save Functions
+# Save Functions (FIXED: DEDUPE BY TIME AND SYMBOL)
 # ----------------------------------------------------------------------
 async def clean_and_save_candles_async(df: pd.DataFrame, data_dir: Path) -> bool:
     if df.empty:
         log.warning("No candle data to save")
         return False
 
-    df = df.dropna(subset=["time"]).drop_duplicates("time").sort_values("time")
+    # ✅ FIX: Ensure we drop duplicates only if SAME TIMESTAMP and SAME SYMBOL
+    df = df.dropna(subset=["time"]).drop_duplicates(subset=["time", "symbol"]).sort_values("time")
+    
     if df.empty:
         log.error("No valid candle data after cleaning")
         return False

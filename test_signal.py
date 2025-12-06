@@ -1,8 +1,7 @@
-# --- test_signal.py ---
+# --- detla-bot/test_signal.py ---
 # WORLD-CLASS TESTER
-# ✅ UPDATED: Auto-fetches LIVE prices to ensure valid SL/TP orders
-# ✅ UPDATED: payload matches ml_strategy.py exactly
-# ✅ FIX: Prevents "Order Rejected" errors due to bad price levels
+# ✅ UPDATED: Testing BTCUSD
+# ✅ FIX: Handles Dictionary-based Position Sizing (extracts correct float)
 
 import asyncio
 import json
@@ -12,12 +11,11 @@ from redis import asyncio as aioredis
 from config import REDIS_URL, SIGNAL_CHANNEL, BASE_POSITION_SIZE, DELTA_BASE_URL
 
 # --- Configuration ---
-# Set the symbol you want to test
-TEST_SYMBOL = "SOLUSD" 
+TEST_SYMBOL = "BTCUSD"   # ✅ Changed to BTCUSD
 TEST_DIRECTION = "LONG"  # "LONG" or "SHORT"
 
 async def get_live_price(symbol: str) -> float:
-    """Fetches the current Mark Price from Delta Exchange to generate valid signals."""
+    """Fetches the current Mark Price from Delta Exchange."""
     url = f"{DELTA_BASE_URL}/v2/tickers/{symbol}"
     async with aiohttp.ClientSession() as session:
         try:
@@ -35,7 +33,7 @@ async def get_live_price(symbol: str) -> float:
             return 0.0
 
 async def generate_smart_signal(symbol: str, direction: str):
-    """Generates a signal with valid SL/TP based on live market data."""
+    """Generates a signal with valid SL/TP and Size."""
     
     # 1. Get Live Price
     entry_price = await get_live_price(symbol)
@@ -43,48 +41,53 @@ async def generate_smart_signal(symbol: str, direction: str):
         print("❌ Cannot generate signal without live price.")
         return None
 
-    # 2. Calculate realistic ATR (Approx 1% of price)
+    # 2. Calculate realistic ATR (1%)
     mock_atr = entry_price * 0.01
     
-    # 3. Calculate valid SL/TP based on direction
-    # R/R Ratio 1.5:1 logic similar to strategy
+    # 3. Calculate Bracket
     sl_dist = mock_atr * 2.0
     tp_dist = sl_dist * 1.5
 
     if direction == "LONG":
         sl_price = entry_price - sl_dist
         tp_price = entry_price + tp_dist
-    else: # SHORT
+    else: 
         sl_price = entry_price + sl_dist
         tp_price = entry_price - tp_dist
 
-    # 4. Construct Payload (Matches ml_strategy.py)
+    # 4. ✅ FIX: Extract correct float size from Config Dictionary
+    if isinstance(BASE_POSITION_SIZE, dict):
+        # Get size for symbol, default to 0.001 if missing
+        trade_size = BASE_POSITION_SIZE.get(symbol, 0.001)
+    else:
+        trade_size = float(BASE_POSITION_SIZE)
+
+    print(f"📏 Using Test Size: {trade_size} for {symbol}")
+
+    # 5. Construct Payload
     signal = {
         "symbol": symbol,
         "direction": direction,
-        "confidence": 0.99, # High confidence for testing
-        "size_hint": BASE_POSITION_SIZE,
+        "confidence": 0.99, 
+        "size_hint": trade_size, # Sending float, not dict
         "trigger_price": entry_price,
         "tp_price": round(tp_price, 4),
         "sl_price": round(sl_price, 4),
         "atr": round(mock_atr, 4),
-        "candles": [], # Empty list is fine for execution test
+        "candles": [],
         "timestamp": int(time.time() * 1_000_000)
     }
     
     return signal
 
 async def publish_test_signal():
-    # 1. Connect to Redis
     redis = await aioredis.from_url(REDIS_URL)
     
     print(f"🚀 Generating {TEST_DIRECTION} Test Signal for {TEST_SYMBOL}...")
     
-    # 2. Generate Signal
     signal = await generate_smart_signal(TEST_SYMBOL, TEST_DIRECTION)
     
     if signal:
-        # 3. Publish
         await redis.publish(SIGNAL_CHANNEL, json.dumps(signal))
         print(f"✅ Published to {SIGNAL_CHANNEL}:")
         print(json.dumps(signal, indent=2))
@@ -93,9 +96,6 @@ async def publish_test_signal():
     await redis.aclose()
 
 if __name__ == "__main__":
-    # -----------------------------------------------------------------
-    # 🚀 IMPORTANT: Ensure 'main.py' is running in another terminal!
-    # -----------------------------------------------------------------
     try:
         asyncio.run(publish_test_signal())
     except KeyboardInterrupt:
