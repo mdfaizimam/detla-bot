@@ -2,6 +2,7 @@
 __pycache__/
 gitinnore folder/
 model folder/
+tests folder/
 *.py[cod]
 *$py.class
 *.so
