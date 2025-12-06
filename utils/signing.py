@@ -53,12 +53,8 @@ async def sync_time_offset(http_session: aiohttp.ClientSession):
 
 def get_synced_time() -> int:
     """Returns the current Unix time (in seconds) adjusted by the server offset."""
-    # Periodically re-sync, e.g., every 6 hours
     if (time.time() - _offset_last_synced) > 6 * 3600:
         logger.warning("Time offset is stale. Re-sync should be triggered.")
-        # Note: A real implementation would trigger a re-sync via a background task
-        # For this bot, the initial sync on startup is the most critical fix.
-        
     return int(time.time() + _time_offset)
 # ----------------------------------------------------------------------
 

@@ -1,16 +1,16 @@
-aiohttp
-aioredis
-pandas
-numpy
-scikit-learn
-imbalanced-learn
-joblib
-python-dotenv
-pandas_ta_classic
-ta
+aiohttp>=3.9.1
+aioredis==2.0.1
+redis==5.0.1
+python-dotenv==1.0.0
+orjson==3.9.10
+numpy>=1.26.3
+joblib>=1.3.2
+scikit-learn>=1.3.2
+pandas>=2.1.4
+pandas-ta-classic
+ta>=0.11.0
 shap
 # ✅ NEW: Performance & Visualization
-orjson       # Fastest JSON library (Speed Upgrade)
 streamlit    # Dashboarding
 plotly       # Interactive Charts
 watchdog     # For Streamlit auto-reload
