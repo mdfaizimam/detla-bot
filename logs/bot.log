@@ -1,0 +1,1593 @@
+2025-12-06 21:20:06,752 [INFO] [main]: Application starting up.
+2025-12-06 21:20:06,753 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:20:06,755 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:20:06,757 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:20:06,757 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:20:08,532 [INFO] [signing]: ✅ Server time offset synced: -0.53 seconds.
+2025-12-06 21:20:08,532 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:20:08,547 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:20:08,547 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:20:08,547 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:20:08,547 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:20:08,547 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:20:08,547 [ERROR] [ml_strategy]: ❌ Model file not found at model\signal_classifier.joblib. Strategy cannot run.
+2025-12-06 21:20:08,547 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:20:08,547 [INFO] [risk_manager]: RiskManager reset: Sleeping for 29391 seconds (until 00:00 UTC).
+2025-12-06 21:20:08,547 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:20:08,547 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:20:08,547 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:20:08,547 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:20:08,547 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:20:08,554 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:20:08,554 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:20:08,554 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:20:08,555 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:20:08,556 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:20:08,557 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:20:08,557 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:20:08,557 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:20:08,558 [INFO] [feature_engine]: FeatureEngine main task cancelled.
+2025-12-06 21:20:08,558 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:20:08,558 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:20:08,559 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:20:08,559 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:20:08,560 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:20:08,560 [INFO] [main]: 📄 Log listener stopped.
+2025-12-06 21:20:08,560 [INFO] [main]: ✅ All services stopped cleanly.
+2025-12-06 21:20:08,560 [INFO] [main]: 🟢 Bot exited. Restarting in 10s...
+2025-12-06 21:20:18,564 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:20:18,564 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:20:18,564 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:20:18,564 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:20:18,955 [INFO] [signing]: ✅ Server time offset synced: -0.96 seconds.
+2025-12-06 21:20:18,955 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:20:18,955 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:20:18,955 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:20:18,971 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:20:18,971 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:20:18,971 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:20:18,971 [ERROR] [ml_strategy]: ❌ Model file not found at model\signal_classifier.joblib. Strategy cannot run.
+2025-12-06 21:20:18,971 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:20:18,971 [INFO] [risk_manager]: RiskManager reset: Sleeping for 29381 seconds (until 00:00 UTC).
+2025-12-06 21:20:18,971 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:20:18,971 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:20:18,977 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:20:18,977 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:20:18,977 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:20:18,977 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:20:18,978 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:20:18,978 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:20:18,978 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:20:18,979 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:20:18,979 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:20:18,979 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:20:18,979 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:20:18,981 [INFO] [feature_engine]: FeatureEngine main task cancelled.
+2025-12-06 21:20:18,981 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:20:18,981 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:20:18,984 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:20:18,984 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:20:18,984 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:20:18,987 [INFO] [main]: 📄 Log listener stopped.
+2025-12-06 21:20:18,989 [INFO] [main]: ✅ All services stopped cleanly.
+2025-12-06 21:20:18,989 [INFO] [main]: 🟢 Bot exited. Restarting in 10s...
+2025-12-06 21:20:29,006 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:20:29,006 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:20:29,006 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:20:29,006 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:20:29,399 [INFO] [signing]: ✅ Server time offset synced: -0.40 seconds.
+2025-12-06 21:20:29,399 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:20:29,401 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:20:29,401 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:20:29,403 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:20:29,403 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:20:29,403 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:20:29,403 [ERROR] [ml_strategy]: ❌ Model file not found at model\signal_classifier.joblib. Strategy cannot run.
+2025-12-06 21:20:29,403 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:20:29,403 [INFO] [risk_manager]: RiskManager reset: Sleeping for 29371 seconds (until 00:00 UTC).
+2025-12-06 21:20:29,403 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:20:29,403 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:20:29,403 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:20:29,403 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:20:29,403 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:20:29,406 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:20:29,406 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:20:29,406 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:20:29,406 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:20:29,408 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:20:29,408 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:20:29,408 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:20:29,408 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:20:29,409 [INFO] [feature_engine]: FeatureEngine main task cancelled.
+2025-12-06 21:20:29,409 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:20:29,409 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:20:29,410 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:20:29,410 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:20:29,410 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:20:29,412 [INFO] [main]: 📄 Log listener stopped.
+2025-12-06 21:20:29,412 [INFO] [main]: ✅ All services stopped cleanly.
+2025-12-06 21:20:29,412 [INFO] [main]: 🟢 Bot exited. Restarting in 10s...
+2025-12-06 21:20:39,428 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:20:39,428 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:20:39,428 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:20:39,428 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:20:40,066 [INFO] [signing]: ✅ Server time offset synced: -1.07 seconds.
+2025-12-06 21:20:40,066 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:20:40,066 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:20:40,066 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:20:40,072 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:20:40,072 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:20:40,072 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:20:40,075 [ERROR] [ml_strategy]: ❌ Model file not found at model\signal_classifier.joblib. Strategy cannot run.
+2025-12-06 21:20:40,075 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:20:40,075 [INFO] [risk_manager]: RiskManager reset: Sleeping for 29360 seconds (until 00:00 UTC).
+2025-12-06 21:20:40,076 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:20:40,076 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:20:40,076 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:20:40,076 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:20:40,077 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:20:40,077 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:20:40,077 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:20:40,078 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:20:40,078 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:20:40,079 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:20:40,079 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:20:40,079 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:20:40,079 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:20:40,080 [INFO] [feature_engine]: FeatureEngine main task cancelled.
+2025-12-06 21:20:40,080 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:20:40,081 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:20:40,081 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:20:40,081 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:20:40,082 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:21:18,001 [INFO] [main]: Application starting up.
+2025-12-06 21:21:18,001 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:21:18,001 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:21:18,001 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:21:18,001 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:21:19,386 [INFO] [signing]: ✅ Server time offset synced: -0.39 seconds.
+2025-12-06 21:21:19,386 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:21:19,386 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:21:19,386 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:21:19,394 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:21:19,394 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:21:19,394 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:21:24,198 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 21:21:24,198 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:21:24,199 [INFO] [risk_manager]: RiskManager reset: Sleeping for 29316 seconds (until 00:00 UTC).
+2025-12-06 21:21:24,199 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:21:24,199 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:21:24,199 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:21:24,199 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:21:24,199 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 21:21:24,202 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:21:24,202 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:21:24,202 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:21:24,202 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:21:24,202 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:21:24,213 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 21:21:24,386 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 21:21:24,842 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 21:21:24,942 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 5m
+2025-12-06 21:21:25,492 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 21:21:25,593 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 21:21:25,593 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 21:21:25,987 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 21:21:26,471 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 21:21:27,248 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 21:21:27,765 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 21:21:28,237 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 21:21:28,736 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 5m
+2025-12-06 21:21:29,238 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 21:21:29,738 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 21:21:30,232 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 21:21:30,755 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 21:21:32,268 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 21:21:32,755 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 21:21:33,306 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 5m
+2025-12-06 21:21:33,773 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 21:21:34,268 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 21:21:34,749 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 21:21:35,266 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 21:21:35,791 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ Priming complete. Processing 543 buffered messages...
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7662671).
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8879234).
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4306400).
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 21:21:36,501 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 21:21:36,565 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 21:21:36,571 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:21:37,975 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:21:37,975 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:21:53,907 [INFO] [executor]: 🏃 Starting Limit Chase for BTCUSD LONG (Size: 1)
+2025-12-06 21:21:57,346 [INFO] [executor]: ⏳ Placed Limit Order 1072224736 @ 89838.0 (Attempt 1)
+2025-12-06 21:22:00,854 [ERROR] [executor]: ❌ Error handling signal for BTCUSD: 'DeltaAPIClient' object has no attribute 'delete'
+Traceback (most recent call last):
+  File "C:\deltaBot\Bot\detla-bot\executor.py", line 158, in _handle_signal
+    filled_avg_price, product_id = await self._execute_entry(symbol, direction, int_size, product_info)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\deltaBot\Bot\detla-bot\executor.py", line 249, in _execute_entry
+    await self.api_client.delete(f"/v2/orders/{order_id}")
+          ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DeltaAPIClient' object has no attribute 'delete'
+2025-12-06 21:33:07,890 [INFO] [executor]: 🏃 Starting Limit Chase for BTCUSD LONG (Size: 1)
+2025-12-06 21:33:10,789 [INFO] [executor]: ⏳ Placed Limit Order 1072238193 @ 89830.0 (Attempt 1)
+2025-12-06 21:33:14,268 [ERROR] [executor]: ❌ Error handling signal for BTCUSD: 'DeltaAPIClient' object has no attribute 'delete'
+Traceback (most recent call last):
+  File "C:\deltaBot\Bot\detla-bot\executor.py", line 158, in _handle_signal
+    filled_avg_price, product_id = await self._execute_entry(symbol, direction, int_size, product_info)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\deltaBot\Bot\detla-bot\executor.py", line 249, in _execute_entry
+    await self.api_client.delete(f"/v2/orders/{order_id}")
+          ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DeltaAPIClient' object has no attribute 'delete'
+2025-12-06 21:35:07,114 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 21:35:07,152 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 21:35:07,152 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:35:07,152 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:35:07,152 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:35:07,153 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 21:35:07,153 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 21:35:07,161 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:35:07,162 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 21:35:07,162 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:35:07,163 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 21:35:07,163 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 21:35:07,164 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 21:35:07,164 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 21:35:07,175 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:35:08,662 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 21:35:08,662 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:35:08,662 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:35:08,662 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:35:12,785 [INFO] [main]: Application starting up.
+2025-12-06 21:35:12,788 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:35:12,790 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:35:12,790 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:35:12,790 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:35:14,512 [INFO] [signing]: ✅ Server time offset synced: -0.51 seconds.
+2025-12-06 21:35:14,512 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:35:14,512 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:35:14,512 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:35:14,515 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:35:14,515 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:35:14,515 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:35:18,713 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 21:35:18,713 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:35:18,713 [INFO] [risk_manager]: RiskManager reset: Sleeping for 28481 seconds (until 00:00 UTC).
+2025-12-06 21:35:18,713 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:35:18,713 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:35:18,713 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:35:18,713 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:35:18,713 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 21:35:18,713 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:35:18,713 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:35:18,713 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:35:18,713 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:35:18,713 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:35:18,744 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 21:35:19,042 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 21:35:19,539 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 5m
+2025-12-06 21:35:20,022 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 21:35:20,418 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 21:35:20,418 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 21:35:20,418 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 21:35:20,418 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 21:35:20,422 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 21:35:20,422 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 21:35:20,518 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 21:35:21,021 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 21:35:21,026 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 21:35:21,026 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 21:35:21,542 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 21:35:22,044 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 21:35:22,560 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 21:35:23,094 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 5m
+2025-12-06 21:35:23,592 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 21:35:24,094 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 21:35:24,595 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 21:35:25,127 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 21:35:25,644 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 21:35:26,153 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 21:35:26,896 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 5m
+2025-12-06 21:35:27,402 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 21:35:27,944 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 21:35:28,442 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 21:35:28,973 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 21:35:29,510 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ Priming complete. Processing 435 buffered messages...
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7666671).
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8883233).
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4307928).
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 21:35:30,091 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 21:35:30,134 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 21:35:30,134 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:35:30,151 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:35:30,159 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:35:37,586 [INFO] [executor]: 🏃 Starting Limit Chase for BTCUSD LONG (Size: 1)
+2025-12-06 21:35:40,350 [INFO] [executor]: ⏳ Placed Limit Order 1072241721 @ 89863.0 (Attempt 1)
+2025-12-06 21:35:44,169 [ERROR] [api_client]: API Request to /v2/orders/1072241721 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:35:44,171 [WARNING] [api_client]: API Request to /v2/orders/1072241721 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:35:44,171 [INFO] [executor]: ♻️ Order 1072241721 not filled. Repricing...
+2025-12-06 21:35:46,363 [INFO] [executor]: ⏳ Placed Limit Order 1072241891 @ 89870.5 (Attempt 2)
+2025-12-06 21:35:50,040 [ERROR] [api_client]: API Request to /v2/orders/1072241891 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:35:50,040 [WARNING] [api_client]: API Request to /v2/orders/1072241891 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:35:50,040 [INFO] [executor]: ♻️ Order 1072241891 not filled. Repricing...
+2025-12-06 21:35:51,583 [INFO] [executor]: ⏳ Placed Limit Order 1072242049 @ 89884.0 (Attempt 3)
+2025-12-06 21:35:55,404 [ERROR] [api_client]: API Request to /v2/orders/1072242049 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:35:55,404 [WARNING] [api_client]: API Request to /v2/orders/1072242049 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:35:55,404 [INFO] [executor]: ♻️ Order 1072242049 not filled. Repricing...
+2025-12-06 21:35:57,065 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '17.073628307253931900', 'margin_mode': 'isolated', 'required_additional_balance': '1.01124661'}}, 'success': False}
+2025-12-06 21:35:57,065 [WARNING] [executor]: Limit order failed (Attempt 4): {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '17.073628307253931900', 'margin_mode': 'isolated', 'required_additional_balance': '1.01124661'}}, 'success': False}
+2025-12-06 21:35:59,707 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '17.073628307253931900', 'margin_mode': 'isolated', 'required_additional_balance': '1.01124661'}}, 'success': False}
+2025-12-06 21:35:59,707 [WARNING] [executor]: Limit order failed (Attempt 5): {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '17.073628307253931900', 'margin_mode': 'isolated', 'required_additional_balance': '1.01124661'}}, 'success': False}
+2025-12-06 21:36:00,741 [WARNING] [executor]: 🚨 Chase failed after 5 attempts. Sending Market Order.
+2025-12-06 21:36:02,048 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '17.073628307253931900', 'margin_mode': 'isolated', 'required_additional_balance': '1.01185015'}}, 'success': False}
+2025-12-06 21:38:33,779 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 21:38:33,782 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 21:38:33,784 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:38:33,784 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:38:33,784 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:38:33,784 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:38:33,784 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 21:38:33,784 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 21:38:33,788 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 21:38:33,788 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:38:33,788 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 21:38:33,788 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 21:38:33,795 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 21:38:33,797 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 21:38:33,802 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:38:33,985 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 21:38:33,985 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:38:33,985 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:38:33,989 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:39:00,237 [INFO] [main]: Application starting up.
+2025-12-06 21:39:00,237 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:39:00,237 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:39:00,237 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:39:00,237 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:39:00,598 [INFO] [signing]: ✅ Server time offset synced: -0.60 seconds.
+2025-12-06 21:39:00,598 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:39:00,598 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:39:00,598 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:39:00,598 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:39:00,598 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:39:00,598 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:39:04,787 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 21:39:04,787 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:39:04,787 [INFO] [risk_manager]: RiskManager reset: Sleeping for 28255 seconds (until 00:00 UTC).
+2025-12-06 21:39:04,789 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:39:04,789 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:39:04,789 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:39:04,789 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:39:04,789 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 21:39:04,789 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:39:04,789 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:39:04,789 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:39:04,789 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:39:04,789 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:39:04,810 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 21:39:05,091 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 21:39:05,589 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 5m
+2025-12-06 21:39:06,090 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 21:39:06,462 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 21:39:06,589 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 21:39:07,065 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 21:39:07,065 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 21:39:07,087 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 21:39:07,873 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 21:39:08,399 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 21:39:08,885 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 21:39:09,385 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 5m
+2025-12-06 21:39:09,879 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 21:39:10,475 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 21:39:10,989 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 21:39:11,631 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 21:39:12,160 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 21:39:12,655 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 21:39:13,136 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 5m
+2025-12-06 21:39:13,764 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 21:39:14,265 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 21:39:14,750 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 21:39:15,266 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 21:39:15,768 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ Priming complete. Processing 408 buffered messages...
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7667943).
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8884605).
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4308402).
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 21:39:16,410 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 21:39:16,448 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 21:39:18,201 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:39:18,208 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:39:18,869 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:39:39,265 [INFO] [executor]: 🏃 Starting Limit Chase for BTCUSD LONG (Size: 1)
+2025-12-06 21:39:41,947 [INFO] [executor]: ⏳ Placed Limit Order 1072247696 @ 89931.5 (Attempt 1)
+2025-12-06 21:39:46,390 [ERROR] [api_client]: API Request to /v2/orders/1072247696 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:39:46,390 [WARNING] [api_client]: API Request to /v2/orders/1072247696 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:39:46,390 [WARNING] [executor]: Failed to cancel order 1072247696 (Status 404). It might be filled.
+2025-12-06 21:39:46,999 [INFO] [executor]: ♻️ Order 1072247696 not filled/cancelled. Repricing...
+2025-12-06 21:39:48,518 [INFO] [executor]: ⏳ Placed Limit Order 1072247858 @ 89925.5 (Attempt 2)
+2025-12-06 21:39:52,175 [ERROR] [api_client]: API Request to /v2/orders/1072247858 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:39:52,175 [WARNING] [api_client]: API Request to /v2/orders/1072247858 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:39:52,175 [WARNING] [executor]: Failed to cancel order 1072247858 (Status 404). It might be filled.
+2025-12-06 21:39:52,732 [INFO] [executor]: ♻️ Order 1072247858 not filled/cancelled. Repricing...
+2025-12-06 21:39:54,535 [INFO] [executor]: ⏳ Placed Limit Order 1072247991 @ 89924.0 (Attempt 3)
+2025-12-06 21:39:58,421 [ERROR] [api_client]: API Request to /v2/orders/1072247991 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:39:58,425 [WARNING] [api_client]: API Request to /v2/orders/1072247991 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:39:58,425 [WARNING] [executor]: Failed to cancel order 1072247991 (Status 404). It might be filled.
+2025-12-06 21:39:58,982 [INFO] [executor]: ♻️ Order 1072247991 not filled/cancelled. Repricing...
+2025-12-06 21:40:00,648 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'insufficient_margin', 'context': {'asset_symbol': 'USD', 'available_balance': '16.921080615000000000', 'margin_mode': 'isolated', 'required_additional_balance': '1.17003089'}}, 'success': False}
+2025-12-06 21:40:00,648 [CRITICAL] [executor]: 🛑 Insufficient Margin! Stopping Chase for BTCUSD.
+2025-12-06 21:40:08,772 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 21:40:09,036 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 21:40:09,038 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:40:09,038 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:40:09,038 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:40:09,038 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 21:40:09,038 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 21:40:09,046 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:40:09,046 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 21:40:09,046 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:40:09,047 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 21:40:09,047 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 21:40:09,047 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 21:40:09,048 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 21:40:09,056 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:40:09,179 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 21:40:09,179 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:40:09,179 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:40:09,179 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 21:49:03,080 [INFO] [main]: Application starting up.
+2025-12-06 21:49:03,080 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 21:49:03,085 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 21:49:03,085 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 21:49:03,085 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 21:49:04,847 [INFO] [signing]: ✅ Server time offset synced: -0.85 seconds.
+2025-12-06 21:49:04,847 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 21:49:04,848 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 21:49:04,848 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 21:49:04,851 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 21:49:04,851 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 21:49:04,851 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 21:49:09,425 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 21:49:09,425 [INFO] [executor]: ✅ OrderExecutionManager initialized (Maker Mode: True).
+2025-12-06 21:49:09,425 [INFO] [risk_manager]: RiskManager reset: Sleeping for 27651 seconds (until 00:00 UTC).
+2025-12-06 21:49:09,429 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 21:49:09,429 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 21:49:09,429 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 21:49:09,429 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 21:49:09,429 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 21:49:09,433 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 21:49:09,433 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 21:49:09,433 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 21:49:09,433 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 21:49:09,433 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 21:49:09,445 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 21:49:09,698 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 21:49:10,188 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 5m
+2025-12-06 21:49:10,224 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 21:49:10,224 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 21:49:10,224 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 21:49:10,227 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 21:49:10,227 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 21:49:10,227 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 21:49:10,688 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 21:49:10,817 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 21:49:10,817 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 21:49:11,165 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 21:49:11,659 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 21:49:12,466 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 21:49:12,964 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 21:49:13,467 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 21:49:13,969 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 5m
+2025-12-06 21:49:14,448 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 21:49:14,952 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 21:49:15,452 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 21:49:16,005 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 21:49:16,496 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 21:49:16,988 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 21:49:17,459 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 5m
+2025-12-06 21:49:17,944 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 21:49:18,405 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 21:49:18,916 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 21:49:19,416 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 21:49:19,931 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 21:49:20,578 [INFO] [feature_engine]: ✅ Priming complete. Processing 356 buffered messages...
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7670877).
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8887648).
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4309353).
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 21:49:20,580 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 21:49:20,610 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 21:49:20,610 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:49:20,617 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:49:21,512 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 21:49:29,768 [INFO] [executor]: 🏃 Starting Limit Chase for BTCUSD LONG (Size: 1)
+2025-12-06 21:49:31,116 [INFO] [executor]: ⏳ Placed Limit Order 1072259646 @ 89855.0 (Attempt 1)
+2025-12-06 21:49:35,356 [ERROR] [api_client]: API Request to /v2/orders/1072259646 returned non-JSON response with status 404. Response: Not Found
+2025-12-06 21:49:35,356 [WARNING] [api_client]: API Request to /v2/orders/1072259646 failed with status 404. Response: {'success': False, 'error': 'Non-JSON response: Not Found'}
+2025-12-06 21:49:35,356 [WARNING] [executor]: ⚠️ Order 1072259646 404 on Cancel. Stopping chase to prevent double-fill.
+2025-12-06 21:51:57,674 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 21:51:57,784 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 21:51:57,784 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 21:51:57,784 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 21:51:57,784 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 21:51:57,784 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 21:51:57,784 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 21:51:57,784 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 21:51:57,792 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 21:51:57,793 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 21:51:57,793 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 21:51:57,793 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 21:51:57,793 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 21:51:57,796 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 21:51:57,810 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 21:51:58,055 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 21:51:58,055 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 21:51:58,055 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 21:51:58,055 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 22:28:46,439 [INFO] [main]: Application starting up.
+2025-12-06 22:28:46,439 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 22:28:46,442 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 22:28:46,442 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 22:28:46,442 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 22:28:48,163 [INFO] [signing]: ✅ Server time offset synced: -1.16 seconds.
+2025-12-06 22:28:48,164 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 22:28:48,164 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 22:28:48,165 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 22:28:48,166 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 22:28:48,166 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 22:28:48,166 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 22:28:52,506 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 22:28:52,506 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 22:28:52,506 [INFO] [risk_manager]: RiskManager reset: Sleeping for 25267 seconds (until 00:00 UTC).
+2025-12-06 22:28:52,508 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 22:28:52,508 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 22:28:52,508 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 22:28:52,508 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 22:28:52,508 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 22:28:52,508 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 22:28:52,508 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 22:28:52,508 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 22:28:52,508 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 22:28:52,508 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 22:28:52,525 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 22:28:52,735 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 22:28:53,241 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 5m
+2025-12-06 22:28:53,753 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 22:28:54,179 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 22:28:54,179 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 22:28:54,179 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 22:28:54,179 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 22:28:54,181 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 22:28:54,181 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 22:28:54,253 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 22:28:54,739 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 22:28:54,739 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 22:28:54,754 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 22:28:55,286 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 22:28:55,780 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 22:28:56,274 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 22:28:56,769 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 5m
+2025-12-06 22:28:57,269 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 22:28:57,759 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 22:28:58,265 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 22:28:58,795 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 22:28:59,295 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 22:28:59,783 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 22:29:00,276 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 5m
+2025-12-06 22:29:00,767 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 22:29:01,271 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 22:29:01,767 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 22:29:02,340 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 22:29:02,853 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ Priming complete. Processing 327 buffered messages...
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7680822).
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8900078).
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4313647).
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 22:29:03,513 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 22:29:03,529 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 22:29:03,529 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:29:04,160 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:29:04,771 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:29:17,066 [INFO] [executor]: 📦 Placing Market Entry: {'product_id': 27, 'size': 1, 'side': 'buy', 'order_type': 'market_order'}
+2025-12-06 22:29:19,266 [INFO] [executor]: 🛡️ Placing Bracket: SL=87876.6 TP=92360.1
+2025-12-06 22:29:20,187 [WARNING] [api_client]: API Request to /v2/orders/bracket failed with status 400. Response: {'error': {'code': 'bad_schema', 'context': {'schema_errors': [{'code': 'validation_error', 'message': 'Expected a BigDecimal value', 'param': 'stop_loss_order.trail_amount'}]}}, 'success': False}
+2025-12-06 22:29:20,187 [ERROR] [executor]: ⚠️ Bracket Placement Failed: {'error': {'code': 'bad_schema', 'context': {'schema_errors': [{'code': 'validation_error', 'message': 'Expected a BigDecimal value', 'param': 'stop_loss_order.trail_amount'}]}}, 'success': False}
+2025-12-06 22:29:20,187 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 22:29:20,187 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=0.0000 (trail x1.00 floor=0.5000)
+2025-12-06 22:29:20,187 [INFO] [executor]: ✅ Trade Executed for BTCUSD @ $0.00. Lock HELD.
+2025-12-06 22:29:20,396 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 22:29:20,396 [INFO] [tsl_manager]: Waiting for SL child (attempt 1/3)...
+2025-12-06 22:29:21,581 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 22:29:21,581 [INFO] [tsl_manager]: Waiting for SL child (attempt 2/3)...
+2025-12-06 22:29:22,764 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 22:29:22,764 [WARNING] [tsl_manager]: Max attempts reached. No SL child found after 3 tries.
+2025-12-06 22:29:22,764 [ERROR] [tsl_manager]: ❌ No SL child found after 3 attempts for BTCUSD.
+2025-12-06 22:29:44,396 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 22:29:44,396 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 22:29:44,396 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 22:29:44,396 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 22:29:44,396 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 22:29:44,396 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 22:29:44,396 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 22:29:44,398 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 22:29:44,398 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 22:29:44,398 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 22:29:44,398 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 22:29:44,398 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 22:29:44,398 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 22:29:44,398 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 22:29:44,399 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 22:29:44,399 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 22:29:44,399 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 22:29:44,399 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 22:29:44,403 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 22:32:24,815 [INFO] [main]: Application starting up.
+2025-12-06 22:32:24,815 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 22:32:24,815 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 22:32:24,815 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 22:32:24,815 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 22:32:25,259 [INFO] [signing]: ✅ Server time offset synced: -0.26 seconds.
+2025-12-06 22:32:25,259 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 22:32:25,259 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 22:32:25,259 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 22:32:25,265 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 22:32:25,265 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 22:32:25,265 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 22:32:29,269 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 22:32:29,269 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 22:32:29,270 [INFO] [risk_manager]: RiskManager reset: Sleeping for 25051 seconds (until 00:00 UTC).
+2025-12-06 22:32:29,271 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 22:32:29,272 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 22:32:29,272 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 22:32:29,272 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 22:32:29,272 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 22:32:29,273 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 22:32:29,273 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 22:32:29,273 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 22:32:29,273 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 22:32:29,274 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 22:32:29,289 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 22:32:29,476 [INFO] [feature_engine]: ✅ Primed 224 candles for BTCUSD 1m
+2025-12-06 22:32:29,929 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 22:32:29,929 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 22:32:29,929 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 22:32:29,929 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 22:32:29,942 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 22:32:29,942 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 22:32:30,094 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 5m
+2025-12-06 22:32:30,598 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 15m
+2025-12-06 22:32:30,640 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 22:32:30,640 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 22:32:31,073 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 1h
+2025-12-06 22:32:31,561 [INFO] [feature_engine]: ✅ Primed 225 candles for BTCUSD 4h
+2025-12-06 22:32:32,106 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 22:32:32,625 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 22:32:33,123 [INFO] [feature_engine]: ✅ Primed 224 candles for ETHUSD 1m
+2025-12-06 22:32:33,626 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 5m
+2025-12-06 22:32:34,143 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 15m
+2025-12-06 22:32:34,628 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 1h
+2025-12-06 22:32:35,128 [INFO] [feature_engine]: ✅ Primed 225 candles for ETHUSD 4h
+2025-12-06 22:32:35,672 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 22:32:36,178 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 22:32:36,699 [INFO] [feature_engine]: ✅ Primed 224 candles for SOLUSD 1m
+2025-12-06 22:32:37,174 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 5m
+2025-12-06 22:32:37,657 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 15m
+2025-12-06 22:32:38,208 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 1h
+2025-12-06 22:32:38,701 [INFO] [feature_engine]: ✅ Primed 225 candles for SOLUSD 4h
+2025-12-06 22:32:39,220 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 22:32:39,717 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ Priming complete. Processing 398 buffered messages...
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7681758).
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8901178).
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4313995).
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 22:32:40,366 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 22:32:40,415 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 22:32:40,416 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:32:41,587 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:32:44,827 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:32:46,981 [INFO] [executor]: 📦 Placing Market Entry: {'product_id': 27, 'size': 1, 'side': 'buy', 'order_type': 'market_order'}
+2025-12-06 22:32:51,336 [INFO] [executor]: 🛡️ Placing Bracket: SL=87828.2 TP=92309.2
+2025-12-06 22:32:52,679 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 22:32:52,689 [INFO] [executor]: ✅ Trade Executed for BTCUSD @ $0.00. Lock HELD.
+2025-12-06 22:32:52,689 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=0.0000 (trail x1.00 floor=0.5000)
+2025-12-06 22:32:53,060 [INFO] [tsl_manager]: ✅ TSL active for BTCUSD: order_id=1072313894 type=limit_order
+2025-12-06 22:32:53,363 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072313894 price=89536.8513 type=limit_order
+2025-12-06 22:32:54,560 [INFO] [tsl_manager]: ✅ Stop order 1072313894 updated to 89536.8513
+2025-12-06 22:32:59,983 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072313894 price=89536.8513 type=limit_order
+2025-12-06 22:33:01,053 [INFO] [tsl_manager]: ✅ Stop order 1072313894 updated to 89536.8513
+2025-12-06 22:33:06,469 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072313894 price=89537.3513 type=limit_order
+2025-12-06 22:33:07,682 [INFO] [tsl_manager]: ✅ Stop order 1072313894 updated to 89537.3513
+2025-12-06 22:33:13,094 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072313894 price=89570.3513 type=limit_order
+2025-12-06 22:33:14,140 [INFO] [tsl_manager]: ✅ Stop order 1072313894 updated to 89570.3513
+2025-12-06 22:33:19,885 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072313894 price=89571.3513 type=limit_order
+2025-12-06 22:33:21,127 [INFO] [tsl_manager]: ✅ Stop order 1072313894 updated to 89571.3513
+2025-12-06 22:33:26,821 [WARNING] [tsl_manager]: ⚠️ Position not active for product_id=27. Skipping stop-loss update.
+2025-12-06 22:33:31,955 [INFO] [tsl_manager]: 🛑 Position marked as inactive for BTCUSD. Stopping TSL.
+2025-12-06 22:33:31,955 [INFO] [tsl_manager]: ✅ TSL stopped for BTCUSD
+2025-12-06 22:38:48,461 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 22:38:48,575 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 22:38:48,576 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 22:38:48,576 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 22:38:48,576 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 22:38:48,576 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 22:38:48,576 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 22:38:48,585 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 22:38:48,585 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 22:38:48,585 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 22:38:48,588 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 22:38:48,588 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 22:38:48,588 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 22:38:48,589 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 22:38:48,603 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 22:38:48,887 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 22:38:48,887 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 22:38:48,887 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 22:38:48,887 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 22:48:24,068 [INFO] [main]: Application starting up.
+2025-12-06 22:48:24,068 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 22:48:24,068 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 22:48:24,068 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 22:48:24,068 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 22:48:25,400 [INFO] [signing]: ✅ Server time offset synced: -0.40 seconds.
+2025-12-06 22:48:25,400 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 22:48:25,400 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 22:48:25,400 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 22:48:25,409 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 22:48:25,409 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 22:48:25,409 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 22:48:30,006 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 22:48:30,006 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 22:48:30,006 [INFO] [risk_manager]: RiskManager reset: Sleeping for 24090 seconds (until 00:00 UTC).
+2025-12-06 22:48:30,006 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 22:48:30,006 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 22:48:30,006 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 22:48:30,009 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 22:48:30,009 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 22:48:30,009 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 22:48:30,009 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 22:48:30,009 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 22:48:30,009 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 22:48:30,013 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 22:48:30,018 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 22:48:30,198 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 22:48:30,481 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 22:48:30,697 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 22:48:30,772 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 22:48:31,045 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 22:48:31,291 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 22:48:31,291 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 22:48:31,323 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 22:48:31,629 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 22:48:31,936 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 22:48:32,228 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 22:48:32,525 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 22:48:32,811 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 22:48:33,082 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 22:48:33,395 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 22:48:33,712 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 22:48:34,026 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 22:48:34,309 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 22:48:34,607 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 22:48:34,912 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 22:48:35,199 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 22:48:35,485 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 22:48:35,797 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 22:48:36,111 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ Priming complete. Processing 225 buffered messages...
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7685895).
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8905709).
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4315493).
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 22:48:36,249 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:48:36,261 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,355 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,358 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:48:36,359 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,465 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,492 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:48:36,492 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,527 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,620 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,620 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,702 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,812 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,820 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:36,871 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,163 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,208 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,210 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,212 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,220 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,288 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,389 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,503 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,626 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,626 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:37,738 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,078 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,170 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,261 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,267 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,277 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,338 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,452 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,474 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,513 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,574 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,653 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,669 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:38,918 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,154 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,183 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,187 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,207 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,213 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,257 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,298 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,315 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,317 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,370 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,406 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,483 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,520 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,667 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,803 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,881 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:39,924 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,037 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,216 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,319 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,435 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,553 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,652 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,868 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,906 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,909 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,940 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:40,974 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,021 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,146 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,203 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,255 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,372 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,534 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,627 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,656 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,659 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,721 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,750 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,791 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,791 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,894 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,970 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:41,973 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,021 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,071 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,180 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,228 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,255 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,305 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,346 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,454 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,459 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,569 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,590 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,687 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,704 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,737 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,814 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,815 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,852 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,931 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,934 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:42,951 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,044 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,049 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,260 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,369 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,456 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,615 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,619 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,804 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,856 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,899 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,925 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,928 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:43,964 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,072 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,185 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,254 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,286 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,310 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,358 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,369 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,428 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,461 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,483 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,547 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,669 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,709 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,802 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,810 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,929 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:44,987 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,009 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,037 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,155 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,155 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,253 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,404 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,478 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,680 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,818 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,934 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:45,973 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,013 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,050 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,374 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,388 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,754 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,756 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:46,758 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,054 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,055 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,056 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,057 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,122 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,122 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,370 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,385 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,388 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,389 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,390 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,393 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,683 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,684 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,988 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,992 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,994 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:47,995 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,022 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,384 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,385 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,588 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,996 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,996 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,996 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:48,996 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,005 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,007 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,009 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,054 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,075 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,121 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,170 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,170 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,194 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,212 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,271 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,304 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,385 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,630 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,653 [ERROR] [feature_engine]: ❌ Failed to publish enriched event: Type is not JSON serializable: numpy.float64
+2025-12-06 22:48:49,677 [INFO] [main]: 🛑 Main loop stopped by user (SIGINT).
+2025-12-06 22:48:49,677 [INFO] [main]: 🔻 Received shutdown signal. Stopping supervisor...
+2025-12-06 22:48:49,677 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 22:48:49,677 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 22:48:49,677 [INFO] [main]: 🔻 Reconciler stopped
+2025-12-06 22:48:49,680 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 22:48:49,680 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 22:48:49,680 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 22:48:49,680 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 22:48:49,680 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 22:48:49,680 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 22:48:49,680 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 22:48:49,680 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 22:48:49,680 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 22:48:49,682 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 22:48:49,682 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 22:48:49,682 [INFO] [main]: 🔻 Health check server stopped
+2025-12-06 22:48:49,685 [INFO] [main]: 🔻 HTTP session closed
+2025-12-06 22:48:49,687 [INFO] [main]: 🔻 Redis connection closed
+2025-12-06 22:51:57,052 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 22:51:57,054 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 22:51:57,054 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 22:51:57,054 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 22:51:57,474 [INFO] [signing]: ✅ Server time offset synced: -0.47 seconds.
+2025-12-06 22:51:57,474 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 22:51:57,474 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 22:51:57,474 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 22:51:57,482 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 22:51:57,482 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 22:51:57,482 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 22:52:01,617 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 22:52:01,617 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 22:52:01,617 [INFO] [risk_manager]: RiskManager reset: Sleeping for 23878 seconds (until 00:00 UTC).
+2025-12-06 22:52:01,617 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 22:52:01,617 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 22:52:01,617 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 22:52:01,617 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 22:52:01,617 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 22:52:01,617 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 22:52:01,617 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 22:52:01,630 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 22:52:01,630 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Anti-Ghost Position Guard)
+2025-12-06 22:52:01,635 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 22:52:01,641 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 22:52:01,835 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 22:52:02,134 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 22:52:02,368 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 22:52:02,450 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 22:52:02,757 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 22:52:02,951 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 22:52:02,951 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 22:52:03,054 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 22:52:03,470 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 22:52:03,781 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 22:52:04,075 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 22:52:04,357 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 22:52:05,449 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 22:52:05,748 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 22:52:06,048 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 22:52:06,399 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 22:52:06,709 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 22:52:06,996 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 22:52:07,279 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 22:52:07,567 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 22:52:07,856 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 22:52:08,146 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 22:52:08,432 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 22:52:08,750 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ Priming complete. Processing 301 buffered messages...
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7686631).
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8906649).
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4315758).
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 22:52:08,867 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 22:52:08,899 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 22:52:08,900 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:52:08,906 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:52:09,257 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:54:35,940 [INFO] [ml_strategy]: 🎯 ML Signal: ETHUSD SHORT (Conf: 0.76 >= 0.74)
+2025-12-06 22:54:35,940 [INFO] [ml_strategy]: 🎯 Using Dynamic SNR for TP: 2982.35 (Default was 3030.7617605057576)
+2025-12-06 22:54:35,942 [INFO] [ml_strategy]: 🚀 Published SHORT (ML_TREND) Size: 1 for ETHUSD
+2025-12-06 22:54:38,250 [INFO] [executor]: 📦 Placing Market Entry: {'product_id': 3136, 'size': 1, 'side': 'sell', 'order_type': 'market_order'}
+2025-12-06 22:54:42,423 [INFO] [executor]: 🛡️ Placing Bracket: SL=3058.24 TP=2982.35
+2025-12-06 22:54:43,446 [INFO] [monitor]: 👀 Started monitoring ETHUSD. Active: {'ETHUSD'}
+2025-12-06 22:54:43,448 [INFO] [tsl_manager]: TSL Loop for ETHUSD started @ entry=0.0000 (trail x1.00 floor=0.5000)
+2025-12-06 22:54:43,449 [INFO] [executor]: ✅ Trade Executed for ETHUSD @ $0.00. Lock HELD.
+2025-12-06 22:54:43,795 [INFO] [tsl_manager]: ✅ TSL active for ETHUSD: order_id=1072336821 type=limit_order
+2025-12-06 22:54:44,106 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072336821 price=5.4961 type=limit_order
+2025-12-06 22:54:44,776 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:44,776 [ERROR] [tsl_manager]: ❌ Failed to update stop order (HTTP 400, code=immediate_execution_stop_order): {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:50,209 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072336821 price=5.4961 type=limit_order
+2025-12-06 22:54:51,343 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:51,343 [ERROR] [tsl_manager]: ❌ Failed to update stop order (HTTP 400, code=immediate_execution_stop_order): {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:56,848 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072336821 price=5.4961 type=limit_order
+2025-12-06 22:54:57,955 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:57,955 [ERROR] [tsl_manager]: ❌ Failed to update stop order (HTTP 400, code=immediate_execution_stop_order): {'error': {'code': 'immediate_execution_stop_order', 'context': {'stop_order_type': 'stop_loss_order'}}, 'success': False}
+2025-12-06 22:54:57,955 [ERROR] [tsl_manager]: ❌ Max consecutive errors reached for ETHUSD. Stopping TSL.
+2025-12-06 22:54:57,956 [INFO] [tsl_manager]: ✅ TSL stopped for ETHUSD
+2025-12-06 22:55:03,066 [ERROR] [reconciler]: ❌ Exception checking position for ETHUSD: 'str' object has no attribute 'get'
+2025-12-06 22:57:49,603 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 22:57:49,603 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 22:57:49,603 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 22:57:49,603 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 22:57:49,603 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 22:57:49,605 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 22:57:49,605 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 22:57:49,605 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 22:57:49,605 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 22:57:49,605 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 22:57:49,605 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 22:57:49,611 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 22:57:49,617 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 22:57:49,743 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 22:59:16,619 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 22:59:16,634 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 22:59:16,634 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 22:59:16,634 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 22:59:17,948 [INFO] [signing]: ✅ Server time offset synced: -0.95 seconds.
+2025-12-06 22:59:17,948 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 22:59:17,948 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 22:59:17,948 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 22:59:17,951 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 22:59:17,951 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 22:59:17,951 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 22:59:21,968 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 22:59:21,968 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 22:59:21,968 [INFO] [risk_manager]: RiskManager reset: Sleeping for 23438 seconds (until 00:00 UTC).
+2025-12-06 22:59:21,968 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 22:59:21,968 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 22:59:21,968 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 22:59:21,968 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 22:59:21,968 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 22:59:21,968 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 22:59:21,968 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 22:59:21,968 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 22:59:21,968 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 22:59:21,968 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 22:59:21,979 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 22:59:22,177 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 22:59:22,469 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 22:59:22,707 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 22:59:22,764 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 22:59:23,055 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 22:59:23,288 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 22:59:23,289 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 22:59:23,365 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 22:59:23,693 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 22:59:24,006 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 22:59:24,290 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 22:59:24,589 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 22:59:24,871 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 22:59:25,164 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 22:59:25,575 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 22:59:25,888 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 22:59:26,186 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 22:59:26,495 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 22:59:26,774 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 22:59:27,060 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 22:59:27,259 [ERROR] [reconciler]: ❌ Error getting product_id for BTCUSD: 'StateReconciler' object has no attribute 'product_info_cache'
+2025-12-06 22:59:27,331 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 22:59:27,539 [ERROR] [reconciler]: ❌ Error getting product_id for SOLUSD: 'StateReconciler' object has no attribute 'product_info_cache'
+2025-12-06 22:59:27,630 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 22:59:27,960 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 22:59:28,272 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 22:59:28,395 [INFO] [feature_engine]: ✅ Priming complete. Processing 295 buffered messages...
+2025-12-06 22:59:28,395 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7688257).
+2025-12-06 22:59:28,401 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8908727).
+2025-12-06 22:59:28,401 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4316323).
+2025-12-06 22:59:28,401 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 22:59:28,401 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 22:59:28,401 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 22:59:28,414 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 22:59:28,426 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:59:28,431 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 22:59:28,646 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:01:24,556 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:01:24,556 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:01:24,556 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:01:24,556 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:01:24,556 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:01:24,556 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:01:24,556 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:01:24,556 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:01:24,556 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:01:24,556 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:01:24,563 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:01:24,563 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:01:24,563 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:01:24,563 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 23:01:28,447 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 23:01:28,459 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 23:01:28,459 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 23:01:28,459 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 23:01:28,838 [INFO] [signing]: ✅ Server time offset synced: -0.84 seconds.
+2025-12-06 23:01:28,844 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 23:01:28,844 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 23:01:28,844 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 23:01:28,847 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 23:01:28,847 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 23:01:28,847 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 23:01:33,219 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 23:01:33,219 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 23:01:33,220 [INFO] [risk_manager]: RiskManager reset: Sleeping for 23307 seconds (until 00:00 UTC).
+2025-12-06 23:01:33,221 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 23:01:33,221 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 23:01:33,222 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 23:01:33,222 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 23:01:33,222 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 23:01:33,222 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 23:01:33,222 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 23:01:33,223 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 23:01:33,223 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 23:01:33,225 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 23:01:33,235 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 23:01:33,431 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 23:01:33,731 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 23:01:34,033 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 15m
+2025-12-06 23:01:34,240 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 23:01:34,241 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 23:01:34,241 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 23:01:34,242 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 23:01:34,242 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 23:01:34,245 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 23:01:34,334 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 23:01:34,628 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 23:01:34,818 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 23:01:34,818 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 23:01:35,063 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 23:01:35,387 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 23:01:35,738 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 23:01:36,020 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 23:01:36,303 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 15m
+2025-12-06 23:01:36,572 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 23:01:36,863 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 23:01:37,179 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 23:01:37,455 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 23:01:37,728 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 23:01:38,026 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 23:01:38,321 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 15m
+2025-12-06 23:01:38,625 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 23:01:38,930 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 23:01:39,222 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 23:01:39,522 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ Priming complete. Processing 234 buffered messages...
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7688900).
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8909514).
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4316574).
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 23:01:39,626 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 23:01:39,645 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 23:01:39,658 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:01:39,672 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:01:39,711 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:04:57,008 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:04:57,008 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:04:57,008 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:04:57,008 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:04:57,008 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:04:57,008 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:04:57,008 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:04:57,008 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:04:57,008 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:04:57,008 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:04:57,008 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:04:57,008 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:04:57,021 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:04:57,021 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 23:05:01,797 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 23:05:01,813 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 23:05:01,813 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 23:05:01,813 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 23:05:02,071 [INFO] [signing]: ✅ Server time offset synced: -1.07 seconds.
+2025-12-06 23:05:02,071 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 23:05:02,071 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 23:05:02,071 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 23:05:02,083 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 23:05:02,083 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 23:05:02,083 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 23:05:06,210 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 23:05:06,210 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 23:05:06,210 [INFO] [risk_manager]: RiskManager reset: Sleeping for 23094 seconds (until 00:00 UTC).
+2025-12-06 23:05:06,210 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 23:05:06,210 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 23:05:06,210 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 23:05:06,210 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 23:05:06,210 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 23:05:06,210 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 23:05:06,210 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 23:05:06,210 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 23:05:06,210 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 23:05:06,210 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 23:05:06,230 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 23:05:06,401 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 23:05:06,694 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 5m
+2025-12-06 23:05:07,315 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 23:05:07,594 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 23:05:07,903 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 23:05:07,922 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 23:05:07,924 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 23:05:07,924 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 23:05:07,925 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 23:05:07,926 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 23:05:07,930 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 23:05:08,357 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 23:05:08,609 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 23:05:08,621 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 23:05:08,660 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 23:05:08,936 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 23:05:09,225 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 5m
+2025-12-06 23:05:09,527 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 23:05:09,939 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 23:05:10,224 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 23:05:10,603 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 23:05:10,899 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 23:05:11,205 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 23:05:11,437 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:05:11,441 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:05:11,441 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=89720.5000 (trail x1.00 floor=0.5000)
+2025-12-06 23:05:11,441 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89720.5
+2025-12-06 23:05:11,511 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 5m
+2025-12-06 23:05:11,619 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:05:11,619 [INFO] [tsl_manager]: Waiting for SL child (attempt 1/3)...
+2025-12-06 23:05:11,927 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 23:05:12,228 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 23:05:12,528 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 23:05:12,806 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:05:12,806 [INFO] [tsl_manager]: Waiting for SL child (attempt 2/3)...
+2025-12-06 23:05:12,943 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 23:05:13,241 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ Priming complete. Processing 272 buffered messages...
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7689818).
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8910414).
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4316841).
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 23:05:13,376 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 23:05:13,393 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 23:05:13,393 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:05:13,432 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:05:14,033 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:05:14,033 [WARNING] [tsl_manager]: Max attempts reached. No SL child found after 3 tries.
+2025-12-06 23:05:14,033 [ERROR] [tsl_manager]: ❌ No SL child found after 3 attempts for BTCUSD.
+2025-12-06 23:05:14,471 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:06:12,208 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:06:12,209 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:06:12,210 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=89720.5000 (trail x1.00 floor=0.5000)
+2025-12-06 23:06:12,211 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89720.5
+2025-12-06 23:06:12,628 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:06:12,628 [INFO] [tsl_manager]: Waiting for SL child (attempt 1/3)...
+2025-12-06 23:06:13,810 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:06:13,811 [INFO] [tsl_manager]: Waiting for SL child (attempt 2/3)...
+2025-12-06 23:06:15,003 [WARNING] [tsl_manager]: No open Stop-Loss order found for product_id=27 (attempt 1/3).
+2025-12-06 23:06:15,003 [WARNING] [tsl_manager]: Max attempts reached. No SL child found after 3 tries.
+2025-12-06 23:06:15,003 [ERROR] [tsl_manager]: ❌ No SL child found after 3 attempts for BTCUSD.
+2025-12-06 23:06:45,309 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:06:45,309 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:06:45,309 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:06:45,309 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:06:45,309 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:06:45,309 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:06:45,309 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:06:45,309 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:06:45,309 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:06:45,309 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:06:45,309 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:06:45,309 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:06:45,309 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:06:45,309 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 23:06:48,748 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 23:06:48,748 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 23:06:48,748 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 23:06:48,748 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 23:06:48,972 [INFO] [signing]: ✅ Server time offset synced: -0.97 seconds.
+2025-12-06 23:06:48,973 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 23:06:48,973 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 23:06:48,973 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 23:06:48,977 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 23:06:48,977 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 23:06:48,977 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 23:06:52,946 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 23:06:52,946 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 23:06:52,946 [INFO] [risk_manager]: RiskManager reset: Sleeping for 22987 seconds (until 00:00 UTC).
+2025-12-06 23:06:52,960 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 23:06:52,960 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 23:06:52,960 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 23:06:52,960 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 23:06:52,960 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 23:06:52,960 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 23:06:52,960 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 23:06:52,962 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 23:06:52,962 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 23:06:52,964 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 23:06:52,969 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 23:06:53,165 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 23:06:53,594 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 23:06:53,739 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 23:06:53,739 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 23:06:53,739 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 23:06:53,749 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 23:06:53,749 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 23:06:53,753 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 23:06:53,890 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 23:06:54,186 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 23:06:54,310 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 23:06:54,310 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 23:06:54,484 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 23:06:55,042 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 23:06:55,352 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 23:06:55,634 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 23:06:55,922 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 23:06:56,220 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 23:06:56,505 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 23:06:56,918 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 23:06:57,282 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 23:06:57,555 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 23:06:57,958 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 23:06:58,266 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 23:06:58,652 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 23:06:59,187 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 23:06:59,471 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 23:06:59,792 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 23:07:00,084 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ Priming complete. Processing 256 buffered messages...
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7690199).
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8910790).
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4316970).
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 23:07:00,192 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 23:07:00,211 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 23:07:00,223 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:07:00,228 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:07:00,317 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:07:58,914 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:07:58,916 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:07:58,917 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=89720.5000 (trail x1.00 floor=0.5000)
+2025-12-06 23:07:58,917 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89720.5
+2025-12-06 23:07:59,104 [INFO] [tsl_manager]: ✅ TSL active for BTCUSD: order_id=1072349213 type=market_order
+2025-12-06 23:07:59,149 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.2913 type=market_order
+2025-12-06 23:08:00,259 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.2913
+2025-12-06 23:08:05,305 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.2913 type=market_order
+2025-12-06 23:08:06,231 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.2913
+2025-12-06 23:08:11,258 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.2913 type=market_order
+2025-12-06 23:08:12,221 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.2913
+2025-12-06 23:08:17,272 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.2913 type=market_order
+2025-12-06 23:08:18,244 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.2913
+2025-12-06 23:08:23,307 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.2913 type=market_order
+2025-12-06 23:08:24,275 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.2913
+2025-12-06 23:08:29,544 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:08:30,463 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:08:35,520 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:08:36,448 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:08:41,895 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:08:42,862 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:08:47,916 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:08:48,840 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:08:53,906 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:08:54,875 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:08:59,614 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:08:59,631 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:08:59,631 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89720.5
+2025-12-06 23:08:59,632 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:09:00,500 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:01,420 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:06,462 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:07,430 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:12,493 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:13,454 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:18,979 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:19,915 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:24,973 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:25,933 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:31,199 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:32,132 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:37,181 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89616.1580 type=market_order
+2025-12-06 23:09:38,108 [INFO] [tsl_manager]: ✅ Stop order 1072349213 updated to 89616.1580
+2025-12-06 23:09:43,138 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072349213 price=89613.4913 type=market_order
+2025-12-06 23:09:44,054 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'open_order_not_found'}, 'success': False}
+2025-12-06 23:09:44,054 [WARNING] [tsl_manager]: ⚠️ Stop-loss order 1072349213 not found. Position may be closed.
+2025-12-06 23:09:49,059 [INFO] [tsl_manager]: 🛑 Position marked as inactive for BTCUSD. Stopping TSL.
+2025-12-06 23:09:49,059 [INFO] [tsl_manager]: ✅ TSL stopped for BTCUSD
+2025-12-06 23:13:29,191 [INFO] [executor]: 📦 Placing Market Entry: {'product_id': 27, 'size': 1, 'side': 'buy', 'order_type': 'market_order'}
+2025-12-06 23:13:32,781 [INFO] [executor]: 🛡️ Placing Bracket: SL=87847.7 TP=92329.7
+2025-12-06 23:13:33,720 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:13:33,720 [INFO] [executor]: ✅ Trade Executed for BTCUSD @ $0.00. Lock HELD.
+2025-12-06 23:13:33,720 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=0.0000 (trail x1.00 floor=0.5000)
+2025-12-06 23:13:33,901 [INFO] [tsl_manager]: ✅ TSL active for BTCUSD: order_id=1072355470 type=limit_order
+2025-12-06 23:13:33,956 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:13:34,888 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:13:39,943 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:13:40,870 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:13:45,921 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:13:46,840 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:13:51,896 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:13:52,858 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:13:57,909 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:13:58,833 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:04,120 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:05,090 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:10,267 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:11,238 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:16,401 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:17,370 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:22,429 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:23,353 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:28,414 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:29,338 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:34,595 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:35,598 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:40,644 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:41,612 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:46,663 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:47,584 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:52,624 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:53,546 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:14:58,622 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89537.5925 type=limit_order
+2025-12-06 23:14:59,600 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89537.5925
+2025-12-06 23:15:04,845 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89550.4468 type=limit_order
+2025-12-06 23:15:04,879 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:15:04,880 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:15:04,881 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:15:04,882 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:15:05,764 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89550.4468
+2025-12-06 23:15:10,805 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89548.9135 type=limit_order
+2025-12-06 23:15:11,728 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89548.9135
+2025-12-06 23:15:17,179 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.9135 type=limit_order
+2025-12-06 23:15:18,121 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.9135
+2025-12-06 23:15:23,167 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.9135 type=limit_order
+2025-12-06 23:15:24,136 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.9135
+2025-12-06 23:15:29,189 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.9135 type=limit_order
+2025-12-06 23:15:30,119 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.9135
+2025-12-06 23:15:35,389 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.9135 type=limit_order
+2025-12-06 23:15:36,391 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.9135
+2025-12-06 23:15:41,450 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.9135 type=limit_order
+2025-12-06 23:15:42,375 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.9135
+2025-12-06 23:15:47,422 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89553.1135 type=limit_order
+2025-12-06 23:15:48,386 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89553.1135
+2025-12-06 23:15:53,450 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:15:54,387 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:15:59,864 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:00,834 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:05,476 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:16:05,477 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:16:05,478 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:16:05,479 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:16:06,536 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:07,506 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:12,569 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:13,497 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:19,333 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:20,273 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:26,144 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:27,298 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:33,122 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89552.1801 type=limit_order
+2025-12-06 23:16:34,119 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89552.1801
+2025-12-06 23:16:39,812 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89563.4468 type=limit_order
+2025-12-06 23:16:40,721 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89563.4468
+2025-12-06 23:16:45,778 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89563.4468 type=limit_order
+2025-12-06 23:16:46,697 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89563.4468
+2025-12-06 23:16:51,761 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89563.4468 type=limit_order
+2025-12-06 23:16:52,689 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89563.4468
+2025-12-06 23:16:57,741 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89563.4468 type=limit_order
+2025-12-06 23:16:58,710 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89563.4468
+2025-12-06 23:17:02,977 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:17:02,977 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:17:02,977 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:17:02,977 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:17:02,978 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:17:02,978 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:17:02,978 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:17:02,978 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:17:02,979 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:17:02,979 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:17:02,979 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:17:02,979 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:17:02,979 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 23:17:03,119 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.

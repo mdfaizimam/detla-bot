@@ -1,6 +1,7 @@
 # --- detla-bot/trailing_stop_manager.py ---
 # FIXED: Parameter bug (product_ids -> product_id)
 # FIXED: Crash on invalid response types (Type Safety)
+# ✅ FIX: Handles Dict response from /v2/positions
 
 import asyncio
 import aiohttp
@@ -164,11 +165,20 @@ class TrailingStopManager:
             
             status, data = await self.api_client.get(path, params=params)
             
-            # ✅ FIX: Type checking to prevent crashes
-            if status == 200 and isinstance(data, dict) and data.get("success"):
-                positions = data.get("result", [])
-                if isinstance(positions, list):
-                    for position in positions:
+            if status == 200 and data and isinstance(data, dict) and data.get("success"):
+                result = data.get("result")
+                
+                # ✅ FIX: Handle Dict Response (Single Object)
+                if isinstance(result, dict):
+                     size = float(result.get("size", 0))
+                     direction = self.active_positions[product_id]["direction"]
+                     if (direction == "LONG" and size > 0) or (direction == "SHORT" and size < 0):
+                        self.active_positions[product_id]["last_validated"] = current_time
+                        return True
+                
+                # ✅ FIX: Handle List Response
+                elif isinstance(result, list):
+                    for position in result:
                         if not isinstance(position, dict): continue
                         if int(position.get("product_id", 0)) == product_id:
                             size = float(position.get("size", 0))

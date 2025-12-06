@@ -1,4 +1,5 @@
 # --- detla-bot/utils/api_client.py ---
+# FIX: Added missing 'delete' method for cancelling orders
 # FIX: Kills bot on "IP not whitelisted" error
 # FIX: Correctly builds the unencoded query string for signature
 
@@ -7,7 +8,7 @@ import json
 import logging
 import aiohttp
 import urllib.parse
-import sys  # ✅ NEW: For hard exit
+import sys
 from aiohttp import client_exceptions
 from typing import Optional, Dict, Any, Tuple
 
@@ -47,13 +48,10 @@ class DeltaAPIClient:
         Internal method to make a signed, authenticated request with retry logic.
         """
         
-        # --- FIX: Build query_string with unencoded commas for signature ---
+        # Build query_string with unencoded commas for signature
         query_string_for_sig = ""
         if params:
-            # Manually build query string to avoid URL-encoding commas
-            # This creates: "?key=val&key2=val,val3"
             query_string_for_sig = "?" + "&".join([f"{k}={v}" for k, v in params.items()])
-        # --- END FIX ---
 
         body = json.dumps(payload, separators=(',', ':'), sort_keys=True) if payload else ""
         
@@ -79,12 +77,11 @@ class DeltaAPIClient:
                     "User-Agent": USER_AGENT
                 }
 
-                # aiohttp's 'params' argument WILL URL-encode the request,
-                # which is correct for the HTTP request itself.
+                # aiohttp's 'params' argument WILL URL-encode the request
                 async with self.session.request(
                     method, 
                     url, 
-                    params=params, # Pass the dict here
+                    params=params, 
                     data=body, 
                     headers=headers
                 ) as resp:
@@ -100,10 +97,10 @@ class DeltaAPIClient:
                         return status, response_json
                     
                     if status == 401:
-                        # ✅ NEW: Hard Kill Switch for IP Issues
+                        # Hard Kill Switch for IP Issues
                         error_code = response_json.get("error", {}).get("code")
                         if error_code == "ip_not_whitelisted_for_api_key":
-                            logger.critical("🚨 FATAL ERROR: IP Address is NOT whitelisted. Stopping bot immediately to prevent ban/spam.")
+                            logger.critical("🚨 FATAL ERROR: IP Address is NOT whitelisted. Stopping bot immediately.")
                             sys.exit(1)
 
                         logger.warning(
@@ -140,3 +137,8 @@ class DeltaAPIClient:
     async def put(self, path: str, payload: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
         """Perform an authenticated PUT request."""
         return await self._request("PUT", path, params=None, payload=payload)
+
+    # ✅ ADDED DELETE METHOD
+    async def delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+        """Perform an authenticated DELETE request."""
+        return await self._request("DELETE", path, params=params, payload=None)

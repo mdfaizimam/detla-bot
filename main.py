@@ -1,6 +1,6 @@
 # --- detla-bot/main.py ---
-# ✅ FIXED: Redis Keepalive enabled to prevent Windows 10054 Connection Reset errors
-# ✅ FIXED: Health Check Server included
+# ✅ FIXED: Windows-compatible Shutdown
+# ✅ FIXED: Redis Keepalive
 
 import asyncio
 import signal
@@ -12,6 +12,7 @@ from aiohttp import web
 from redis import asyncio as aioredis
 import queue
 import time
+import sys
 
 from ws_manager import WebSocketManager
 from feature_engine import FeatureEngine
@@ -106,7 +107,6 @@ async def run_bot():
     
     try:
         # ✅ FIX APPLIED: Socket Keepalive + Health Check Interval
-        # This forces Windows to keep the TCP connection open.
         redis_client = await aioredis.from_url(
             REDIS_URL, 
             decode_responses=True,
@@ -148,72 +148,39 @@ async def run_bot():
             asyncio.create_task(reconciler.start(), name="StateReconciler"),
         ]
 
+        # Wait indefinitely until a task fails or cancellation
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         
         for task in done:
             if task.exception():
                 logger.error(f"💥 Task {task.get_name()} crashed: {task.exception()}", exc_info=task.exception())
 
+    except asyncio.CancelledError:
+        logger.info("🛑 Main loop cancelled.")
     except Exception as e:
         logger.error(f"💥 Fatal error in main startup: {e}", exc_info=True)
     finally:
         logger.info("🔻 Shutting down all services...")
         
-        if reconciler: 
-            await reconciler.stop()
-            logger.info("🔻 Reconciler stopped")
+        if reconciler: await reconciler.stop()
         
         for task in tasks: 
             if not task.done(): task.cancel()
         if tasks: 
             await asyncio.gather(*tasks, return_exceptions=True)
             
-        if health_runner: 
-            await health_runner.cleanup() 
-            logger.info("🔻 Health check server stopped")
-            
-        if http_session: 
-            await http_session.close()
-            logger.info("🔻 HTTP session closed")
-            
-        if redis_client: 
-            await redis_client.aclose()
-            logger.info("🔻 Redis connection closed")
+        if health_runner: await health_runner.cleanup() 
+        if http_session: await http_session.close()
+        if redis_client: await redis_client.aclose()
         
         listener.stop()
-        logger.info("📄 Log listener stopped.")
         logger.info("✅ All services stopped cleanly.")
 
-async def supervisor():
-    while True:
-        await run_bot()
-        logger.info("🟢 Bot exited. Restarting in 10s...")
-        await asyncio.sleep(10)
-
-async def shutdown_supervisor():
-    logger.info("🔻 Received shutdown signal. Stopping supervisor...")
-    for task in asyncio.all_tasks():
-        if task.get_coro().__name__ == 'supervisor':
-            task.cancel()
-
-def handle_interrupt(sig, frame):
-    signal_name = signal.Signals(sig).name 
-    logger.info(f"🛑 Main loop stopped by user ({signal_name}).")
-    asyncio.create_task(shutdown_supervisor())
-
 if __name__ == "__main__":
-    logger.info("Application starting up.")
+    # ✅ FIX: Windows-compatible shutdown logic
     try:
-        signal.signal(signal.SIGINT, handle_interrupt)
-        signal.signal(signal.SIGTERM, handle_interrupt)
-    except ValueError:
-        logger.warning("⚠️ Signal handlers not supported on this platform. Use Ctrl+C to stop.")
-    
-    try: 
-        asyncio.run(supervisor())
-    except asyncio.CancelledError: 
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.run(run_bot())
+    except KeyboardInterrupt:
         pass
-    except Exception as e:
-        logger.error(f"💥 Fatal error during application run: {e}", exc_info=True)
-    finally:
-        logger.info("Application shutting down.")

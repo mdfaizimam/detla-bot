@@ -1,17 +1,15 @@
 # --- detla-bot/feature_engine.py ---
-# ✅ FIX: Restored missing Checksum Logic
-# ✅ UPGRADE: Calculates PMH/PML/Pivots for SNR Strategy
+# ✅ FIX: Enabled Numpy Serialization for orjson
+# ✅ UPGRADE: Fast Numpy Indicators & SNR Levels
 
 import asyncio
-import json
 import logging
 import numpy as np
 import time
 import re 
-import zlib 
+import zlib
+import orjson # ✅ FAST JSON
 from collections import deque 
-import pandas as pd 
-import pandas_ta_classic as ta
 import aiohttp 
 from redis import asyncio as aioredis
 import redis.exceptions 
@@ -21,8 +19,8 @@ from config import (
     ENRICHED_CHANNEL, 
     TRADING_SYMBOLS, 
     DELTA_BASE_URL, 
-    USER_AGENT,
-    VOLUME_TIMEFRAME,
+    USER_AGENT, 
+    VOLUME_TIMEFRAME, 
     VOLUME_SMA_PERIOD,
     ATR_TIMEFRAME,
     SPOT_INDEX_SYMBOLS,
@@ -34,10 +32,9 @@ from utils.binance_client import get_latest_ls_ratio
 
 log = logging.getLogger("feature_engine")
 
-# --- Constants for Feature Calculation ---
+# --- Constants ---
 TFI_LOOKBACK_SECONDS = 5
-CANDLE_HISTORY_SIZE = 100 
-
+CANDLE_HISTORY_SIZE = 200
 CANDLE_RESOLUTIONS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 RESOLUTION_SECONDS = {
     "1m": 60, "5m": 300, "15m": 900, "1h": 3600, 
@@ -57,10 +54,8 @@ class FeatureEngine:
         self.sequence_numbers = {} 
         self.symbol_ready_state = {}
         
-        # Binance Data Cache
         self.binance_cache = {}
         self._binance_poll_task = None
-        
         self.candle_regex = re.compile(r"candlestick_(\w+)")
         
         self._stop_flag = False
@@ -69,7 +64,6 @@ class FeatureEngine:
         self.last_processed_timestamp = 0
 
     async def _poll_external_data(self):
-        """Polls Binance for L/S Ratio every 60s."""
         log.info("🌍 Starting Binance Data Poller...")
         while not self._stop_flag:
             try:
@@ -84,7 +78,11 @@ class FeatureEngine:
 
     async def _publish(self, payload: dict):
         try:
-            await self.redis.publish(ENRICHED_CHANNEL, json.dumps(payload))
+            # ✅ FIX: Enable Numpy Serialization
+            await self.redis.publish(
+                ENRICHED_CHANNEL, 
+                orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY)
+            )
         except Exception as e:
             log.error(f"❌ Failed to publish enriched event: {e}")
 
@@ -104,7 +102,7 @@ class FeatureEngine:
                 "last_trade_price": None, "mark_price": None,
                 "funding_rate": None, "spot_price": None, 
                 "tas": {}, "timestamp": 0,
-                "PWH": None, "PWL": None, "PMH": None, "PML": None, 
+                "PMH": None, "PML": None, 
                 "long_short_ratio": 1.0 
             }
             
@@ -132,7 +130,11 @@ class FeatureEngine:
         
     async def _publish_resubscribe_request(self, symbol: str):
         payload = { "command": "RESUBSCRIBE_L2", "symbol": symbol }
-        await self.redis.publish(CONTROL_CHANNEL, json.dumps(payload))
+        # ✅ FIX: Enable Numpy Serialization
+        await self.redis.publish(
+            CONTROL_CHANNEL, 
+            orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY)
+        )
         self.symbol_ready_state[symbol]["book"] = False
         self.sequence_numbers[symbol] = -1
         self.order_books[symbol]["is_awaiting_snapshot"] = True
@@ -147,7 +149,7 @@ class FeatureEngine:
             for res in CANDLE_RESOLUTIONS:
                 try:
                     duration = RESOLUTION_SECONDS[res]
-                    limit = CANDLE_HISTORY_SIZE + 50 
+                    limit = CANDLE_HISTORY_SIZE + 10 
                     if res in ["1d", "1w"]:
                         start_time = end_time - (3600 * 24 * 365 * 2)
                         limit = 2000 
@@ -166,18 +168,21 @@ class FeatureEngine:
                         if resp.status == 200:
                             data = await resp.json()
                             candles = data.get("result", [])
+                            candles.sort(key=lambda x: x.get("time"))
+                            
                             for candle in candles:
-                                candle_data = {
-                                    "open": float(candle.get("open", 0)),
-                                    "high": float(candle.get("high", 0)),
-                                    "low": float(candle.get("low", 0)),
-                                    "close": float(candle.get("close", 0)),
-                                    "volume": float(candle.get("volume", 0)),
-                                    "timestamp": candle.get("time", 0) * 1_000_000 
-                                }
-                                self.candle_history[symbol][res].append(candle_data)
+                                row = [
+                                    candle.get("time", 0) * 1_000_000,
+                                    float(candle.get("open", 0)),
+                                    float(candle.get("high", 0)),
+                                    float(candle.get("low", 0)),
+                                    float(candle.get("close", 0)),
+                                    float(candle.get("volume", 0))
+                                ]
+                                self.candle_history[symbol][res].append(row)
+                                
                             log.info(f"✅ Primed {len(candles)} candles for {symbol} {res}")
-                    await asyncio.sleep(0.3) 
+                    await asyncio.sleep(0.1) 
                 except Exception as e:
                     log.error(f"Error priming {symbol} {res}: {e}")
         
@@ -185,41 +190,32 @@ class FeatureEngine:
             self._calculate_technical_indicators(symbol)
 
     def _validate_checksum(self, symbol: str, received_cs: int) -> bool:
-        """Validates the CRC32 checksum of the order book against Delta's."""
         book = self.order_books.get(symbol)
         if not book: return False
         
-        # Helper to build the string according to Delta's format
         def build_string(side_data, key_source, ascending):
             prices = sorted(key_source, key=float, reverse=not ascending)
             parts = []
-            # Take top 10 levels
             for price in prices[:10]:
                 size = book[side_data][price]
-                # Format size: integers without decimal, floats with
                 size_str = str(int(size)) if float(size).is_integer() else str(size)
                 parts.append(f"{price}:{size_str}")
             return ",".join(parts)
 
         asks_keys = book["asks"].keys()
         bids_keys = book["bids"].keys()
-        
         asks_str = build_string("asks", asks_keys, ascending=True)
         bids_str = build_string("bids", bids_keys, ascending=False)
-        
         checksum_string = f"{asks_str}|{bids_str}"
         
         try:
-            # Calculate CRC32
             calculated_cs = zlib.crc32(checksum_string.encode('utf-8')) & 0xFFFFFFFF
             received_cs_unsigned = received_cs & 0xFFFFFFFF
-        except AttributeError: 
-            return True 
+        except AttributeError: return True 
             
         if calculated_cs != received_cs_unsigned:
             log.error(f"❌ CHECKSUM MISMATCH for {symbol}! Calc: {calculated_cs}, Recv: {received_cs_unsigned}")
             return False
-            
         return True
 
     def _handle_l2_snapshot(self, data: dict):
@@ -245,16 +241,13 @@ class FeatureEngine:
         if symbol not in self.order_books or symbol not in self.sequence_numbers: return
         new_seq_no = data.get("sequence_no", -1)
         received_cs = data.get("cs", -1)
-        
         if self.sequence_numbers[symbol] == -1: return 
         expected_seq_no = self.sequence_numbers[symbol] + 1
-        
         if new_seq_no != expected_seq_no:
             log.error(f"❌ SEQUENCE MISMATCH for {symbol}! Expected {expected_seq_no}, Got {new_seq_no}.")
             asyncio.create_task(self._publish_resubscribe_request(symbol)) 
             return 
         self.sequence_numbers[symbol] = new_seq_no
-
         for price_str, size_str in data.get("bids", []):
             if size_str is None: 
                 self.order_books[symbol]["bids"].pop(price_str, None)
@@ -262,7 +255,6 @@ class FeatureEngine:
             size = float(size_str)
             if size == 0: self.order_books[symbol]["bids"].pop(price_str, None)
             else: self.order_books[symbol]["bids"][price_str] = size
-            
         for price_str, size_str in data.get("asks", []):
             if size_str is None: 
                 self.order_books[symbol]["asks"].pop(price_str, None)
@@ -270,12 +262,10 @@ class FeatureEngine:
             size = float(size_str)
             if size == 0: self.order_books[symbol]["asks"].pop(price_str, None)
             else: self.order_books[symbol]["asks"][price_str] = size
-
         if received_cs != -1:
             if not self._validate_checksum(symbol, received_cs):
                  asyncio.create_task(self._publish_resubscribe_request(symbol))
                  return
-
         if symbol in self.symbol_ready_state and not self.symbol_ready_state[symbol]["book"]:
             self.symbol_ready_state[symbol]["book"] = True
 
@@ -321,27 +311,36 @@ class FeatureEngine:
         msg_type = data.get("type")
         if not symbol or not msg_type: return
         if symbol not in self.candle_history: self._initialize_state(symbol)
+        
         match = self.candle_regex.match(msg_type)
         if not match: return
         timeframe = match.group(1) 
         if timeframe not in CANDLE_RESOLUTIONS: return 
-        candle_data = {
-            "open": float(data.get("open", 0)),
-            "high": float(data.get("high", 0)),
-            "low": float(data.get("low", 0)),
-            "close": float(data.get("close", 0)),
-            "volume": float(data.get("volume", 0)),
-            "timestamp": data.get("candle_start_time", 0) 
-        }
+        
+        candle_row = [
+            data.get("candle_start_time", 0),
+            float(data.get("open", 0)),
+            float(data.get("high", 0)),
+            float(data.get("low", 0)),
+            float(data.get("close", 0)),
+            float(data.get("volume", 0))
+        ]
+        
         history_deque = self.candle_history[symbol][timeframe]
-        is_new_candle = False
-        if not history_deque or (history_deque and history_deque[-1]["timestamp"] < candle_data["timestamp"]):
-            history_deque.append(candle_data)
-            is_new_candle = True
-        elif history_deque and history_deque[-1]["timestamp"] == candle_data["timestamp"]:
-            history_deque[-1] = candle_data 
-        if is_new_candle:
-             self._calculate_technical_indicators(symbol)
+        
+        if not history_deque:
+            history_deque.append(candle_row)
+            self._calculate_technical_indicators(symbol)
+        else:
+            last_ts = history_deque[-1][0]
+            new_ts = candle_row[0]
+            
+            if new_ts > last_ts:
+                history_deque.append(candle_row)
+                self._calculate_technical_indicators(symbol)
+            elif new_ts == last_ts:
+                history_deque[-1] = candle_row
+                self._calculate_technical_indicators(symbol)
 
     def _handle_funding_rate(self, data: dict):
         symbol = data.get("symbol")
@@ -398,70 +397,129 @@ class FeatureEngine:
     def _calculate_technical_indicators(self, symbol: str):
         if symbol not in self.candle_history: return 
         tas = {} 
+
         for timeframe, candle_deque in self.candle_history[symbol].items():
-            min_candles = max(50, VOLUME_SMA_PERIOD + 2) 
-            if len(candle_deque) < min_candles: continue
+            if len(candle_deque) < 21: continue
+
             try:
-                df = pd.DataFrame(list(candle_deque))
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='us')
-                df = df.drop_duplicates(subset=['timestamp']).set_index('timestamp')
-                df.sort_index(inplace=True) 
+                data = np.array(candle_deque)
+                close = data[:, 4]
+                high = data[:, 2]
+                low = data[:, 3]
+                volume = data[:, 5]
                 
-                df.ta.ema(length=20, append=True)
-                df.ta.ema(length=50, append=True)
-                df.ta.rsi(length=14, append=True)
-                df.ta.macd(fast=12, slow=26, signal=9, append=True)
-                df.ta.obv(append=True)
-                df.ta.adx(length=14, append=True)
+                def fast_ema(values, period):
+                    alpha = 2 / (period + 1)
+                    ema = np.empty_like(values)
+                    ema[0] = values[0]
+                    for i in range(1, len(values)):
+                        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+                    return ema[-1]
+
+                ema_20 = fast_ema(close, 20)
+                ema_50 = fast_ema(close, 50)
                 
+                def fast_rsi(prices, period=14):
+                    if len(prices) < period + 1: return 50.0
+                    deltas = np.diff(prices)
+                    seed = deltas[:period]
+                    up = seed[seed >= 0].sum() / period
+                    down = -seed[seed < 0].sum() / period
+                    if down == 0: return 100.0
+                    rs = up / down
+                    for delta in deltas[period:]:
+                        up = (up * (period - 1) + (delta if delta > 0 else 0)) / period
+                        down = (down * (period - 1) + (-delta if delta < 0 else 0)) / period
+                    if down == 0: return 100.0
+                    rs = up / down
+                    return 100.0 - (100.0 / (1.0 + rs))
+
+                rsi_14 = fast_rsi(close, 14)
+                
+                def get_ema_series(values, period):
+                    alpha = 2 / (period + 1)
+                    ema = np.zeros_like(values)
+                    ema[0] = values[0]
+                    for i in range(1, len(values)):
+                        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+                    return ema
+                
+                e12 = get_ema_series(close, 12)
+                e26 = get_ema_series(close, 26)
+                macd_line = e12 - e26
+                signal_line = get_ema_series(macd_line, 9)
+                macd_hist = macd_line[-1] - signal_line[-1]
+                
+                if len(close) > 1:
+                    prev_close = np.roll(close, 1)
+                    prev_close[0] = close[0]
+                    tr = np.maximum(high - low, np.maximum(np.abs(high - prev_close), np.abs(low - prev_close)))
+                    atr = fast_ema(tr, 14)
+                else:
+                    atr = (high[-1] - low[-1])
+                
+                bb_period = 20
+                if len(close) >= bb_period:
+                    sma20 = np.mean(close[-bb_period:])
+                    std20 = np.std(close[-bb_period:])
+                    bb_upper = sma20 + (2 * std20)
+                    bb_lower = sma20 - (2 * std20)
+                    bb_mid = sma20
+                    bb_width = (bb_upper - bb_lower) / bb_mid
+                else:
+                    bb_upper, bb_lower, bb_mid, bb_width = 0,0,0,0
+
                 er_period = 10
-                change = df['close'].diff(er_period).abs()
-                volatility = df['close'].diff().abs().rolling(er_period).sum()
-                df['KER'] = change / (volatility + 1e-9)
-                
-                df.ta.atr(length=14, append=True)
-                df['FRACTAL_DIM'] = df['ATRr_14'] / (df['close'].rolling(20).std() + 1e-9)
-                df.ta.bbands(length=20, std=2, append=True)
-                
+                if len(close) > er_period:
+                    change = np.abs(close[-1] - close[-er_period - 1])
+                    volatility = np.sum(np.abs(np.diff(close[-er_period-1:])))
+                    ker = change / (volatility + 1e-9)
+                else:
+                    ker = 0.5
+
+                obv_change = np.sign(np.diff(close, prepend=close[0])) * volume
+                obv = np.sum(obv_change)
+                adx_proxy = np.abs(ema_20 - e12[-20]) / close[-1] * 1000
+                fractal_dim = atr / (np.std(close[-20:]) + 1e-9)
+
                 latest_tas = {
-                    "ema_20": df['EMA_20'].iloc[-1],
-                    "ema_50": df['EMA_50'].iloc[-1],
-                    "rsi_14": df['RSI_14'].iloc[-1],
-                    "macd_hist": df['MACDh_12_26_9'].iloc[-1],
-                    "close": df['close'].iloc[-1],
-                    "open": df['open'].iloc[-1],
-                    "obv": df['OBV'].iloc[-1],
-                    "adx": df['ADX_14'].iloc[-1],
-                    "ker": df['KER'].iloc[-1] if 'KER' in df.columns else 0.5,
-                    "fractal_dim": df['FRACTAL_DIM'].iloc[-1] if 'FRACTAL_DIM' in df.columns else 1.0,
-                    "bb_lower": df['BBL_20_2.0'].iloc[-1],
-                    "bb_upper": df['BBU_20_2.0'].iloc[-1],
-                    "bb_mid": df['BBM_20_2.0'].iloc[-1],
-                    "bb_width": df['BBB_20_2.0'].iloc[-1] if 'BBB_20_2.0' in df.columns else 0.0,
-                    "atr": df['ATRr_14'].iloc[-1] if 'ATRr_14' in df.columns else 0.0
+                    "ema_20": ema_20,
+                    "ema_50": ema_50,
+                    "rsi_14": rsi_14,
+                    "macd_hist": macd_hist,
+                    "close": close[-1],
+                    "open": data[-1, 1],
+                    "obv": obv,
+                    "adx": adx_proxy,
+                    "ker": ker,
+                    "fractal_dim": fractal_dim,
+                    "bb_lower": bb_lower,
+                    "bb_upper": bb_upper,
+                    "bb_mid": bb_mid,
+                    "bb_width": bb_width,
+                    "atr": atr
                 }
                 
                 if timeframe == VOLUME_TIMEFRAME:
-                    vol_sma_name = f"SMA_volume_{VOLUME_SMA_PERIOD}"
-                    df.ta.sma(close='volume', length=VOLUME_SMA_PERIOD, append=True, col_names=(vol_sma_name,))
-                    if vol_sma_name in df.columns:
-                        latest_tas["volume"] = df['volume'].iloc[-1]
-                        latest_tas[vol_sma_name] = df[vol_sma_name].iloc[-1]
+                    latest_tas["volume"] = volume[-1]
+                    if len(volume) >= VOLUME_SMA_PERIOD:
+                        latest_tas[f"SMA_volume_{VOLUME_SMA_PERIOD}"] = np.mean(volume[-VOLUME_SMA_PERIOD:])
                 
-                # ✅ NEW: Calculate Daily Pivots & Highs/Lows
-                if timeframe == "1d":
-                    if len(df) > 1:
-                        prev = df.iloc[-2]
-                        self.features[symbol]["PMH"] = float(prev['high'])
-                        self.features[symbol]["PML"] = float(prev['low'])
-                        
-                        P = (prev['high'] + prev['low'] + prev['close']) / 3
-                        latest_tas["pivot"] = P
-                        latest_tas["R1"] = (2 * P) - prev['low']
-                        latest_tas["S1"] = (2 * P) - prev['high']
-                        latest_tas["R2"] = P + (prev['high'] - prev['low'])
-                        latest_tas["S2"] = P - (prev['high'] - prev['low'])
-                        
+                if timeframe == "1d" and len(data) > 1:
+                    prev_h = data[-2, 2]
+                    prev_l = data[-2, 3]
+                    prev_c = data[-2, 4]
+                    
+                    self.features[symbol]["PMH"] = prev_h
+                    self.features[symbol]["PML"] = prev_l
+                    
+                    P = (prev_h + prev_l + prev_c) / 3
+                    latest_tas["pivot"] = P
+                    latest_tas["R1"] = (2 * P) - prev_l
+                    latest_tas["S1"] = (2 * P) - prev_h
+                    latest_tas["R2"] = P + (prev_h - prev_l)
+                    latest_tas["S2"] = P - (prev_h - prev_l)
+
                 tas[timeframe] = latest_tas
                 
             except Exception as e:
@@ -495,12 +553,12 @@ class FeatureEngine:
                 "long_short_ratio": self.features[symbol]["long_short_ratio"],
                 "spot_price": self.features[symbol].get("spot_price"), 
                 "tas": self.features[symbol]["tas"],
-                # Pass SNR levels
                 "PMH": self.features[symbol].get("PMH"),
                 "PML": self.features[symbol].get("PML"),
             }
             try:
-                await self.redis.set(f"{LATEST_ENRICHED_KEY}{symbol}", json.dumps(payload), ex=300) 
+                # ✅ FIX: Enable Numpy Serialization
+                await self.redis.set(f"{LATEST_ENRICHED_KEY}{symbol}", orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY), ex=300) 
                 await self.redis.set(HEALTH_CHECK_KEY_FE, timestamp_us, ex=300)
             except Exception: pass
             await self._publish(payload)
@@ -562,7 +620,8 @@ class FeatureEngine:
                     if self._stop_flag: break
                     if msg.get("type") != "message": continue
                     try: 
-                        raw = json.loads(msg.get("data"))
+                        # ✅ FIX: Use orjson loads
+                        raw = orjson.loads(msg.get("data"))
                         if self._priming_lock.locked(): self._message_buffer.append(raw)
                         else: await self._process_message(raw)
                     except Exception: continue
