@@ -1591,3 +1591,505 @@ AttributeError: 'DeltaAPIClient' object has no attribute 'delete'
 2025-12-06 23:17:02,979 [INFO] [ws_manager]: Control message handler cancelled.
 2025-12-06 23:17:02,979 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
 2025-12-06 23:17:03,119 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:18:19,241 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 23:18:19,249 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 23:18:19,250 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 23:18:19,250 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 23:18:19,580 [INFO] [signing]: ✅ Server time offset synced: -0.58 seconds.
+2025-12-06 23:18:19,580 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 23:18:19,580 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 23:18:19,580 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 23:18:19,580 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 23:18:19,580 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 23:18:19,580 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 23:18:23,694 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 23:18:23,694 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 23:18:23,694 [INFO] [risk_manager]: RiskManager reset: Sleeping for 22296 seconds (until 00:00 UTC).
+2025-12-06 23:18:23,703 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 23:18:23,703 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 23:18:23,703 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 23:18:23,703 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 23:18:23,703 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 23:18:23,703 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 23:18:23,703 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 23:18:23,706 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 23:18:23,706 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 23:18:23,706 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 23:18:23,712 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 23:18:23,910 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 23:18:24,207 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 5m
+2025-12-06 23:18:24,607 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 23:18:24,909 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 23:18:25,241 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 23:18:25,584 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 23:18:25,584 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 23:18:25,584 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 23:18:25,584 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 23:18:25,591 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 23:18:25,592 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 23:18:25,716 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 23:18:26,178 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 23:18:26,288 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 23:18:26,288 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 23:18:26,465 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 23:18:26,759 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 5m
+2025-12-06 23:18:27,040 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 23:18:27,326 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 23:18:27,658 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 23:18:28,002 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 23:18:28,298 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 23:18:28,581 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 23:18:28,877 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 5m
+2025-12-06 23:18:28,952 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:18:28,966 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:18:28,966 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=89630.0000 (trail x1.00 floor=0.5000)
+2025-12-06 23:18:28,966 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:18:29,149 [INFO] [tsl_manager]: ✅ TSL active for BTCUSD: order_id=1072355470 type=limit_order
+2025-12-06 23:18:29,206 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 23:18:29,333 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.4468 type=limit_order
+2025-12-06 23:18:29,509 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 23:18:29,785 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 23:18:30,110 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 23:18:30,336 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.4468
+2025-12-06 23:18:30,418 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ Priming complete. Processing 154 buffered messages...
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7692440).
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8913393).
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4318081).
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 23:18:30,518 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 23:18:30,532 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 23:18:30,714 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:18:30,714 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:18:31,505 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:18:35,376 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:18:36,397 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:18:41,452 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:18:42,405 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:18:47,445 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:18:48,435 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:18:53,471 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:18:54,394 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:00,070 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:00,997 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:06,061 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:07,010 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:12,066 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:13,027 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:18,081 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:19,011 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:24,464 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:25,386 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:29,596 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:19:29,609 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:19:29,617 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:19:29,617 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:19:30,633 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:31,555 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:36,581 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89540.3135 type=limit_order
+2025-12-06 23:19:37,543 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89540.3135
+2025-12-06 23:19:42,601 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.3135 type=limit_order
+2025-12-06 23:19:43,606 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.3135
+2025-12-06 23:19:48,650 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.3135 type=limit_order
+2025-12-06 23:19:49,603 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.3135
+2025-12-06 23:19:54,060 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:19:54,060 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:19:54,060 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:19:54,060 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:19:54,060 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:19:54,060 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:19:54,069 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:19:54,069 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:19:54,069 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:19:54,069 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:19:54,069 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:19:54,069 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:19:54,071 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:19:54,071 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.
+2025-12-06 23:19:57,241 [INFO] [main]: 🚀 Starting Delta Institutional Trading Bot
+2025-12-06 23:19:57,241 [INFO] [main]: 📄 Log listener started for thread-safe logging.
+2025-12-06 23:19:57,241 [INFO] [main]: 📡 Connected to Redis at redis://localhost:6379/0
+2025-12-06 23:19:57,241 [INFO] [main]: 🔗 HTTP ClientSession created
+2025-12-06 23:19:58,906 [INFO] [signing]: ✅ Server time offset synced: -0.91 seconds.
+2025-12-06 23:19:58,906 [INFO] [api_client]: ✅ DeltaAPIClient initialized.
+2025-12-06 23:19:58,906 [INFO] [main]: 🔐 Centralized DeltaAPIClient created
+2025-12-06 23:19:58,906 [INFO] [risk_manager]: ✅ RiskManager initialized (In-memory defaults): Max Drawdown=15.0%, Daily Loss Limit=5.0%
+2025-12-06 23:19:58,906 [INFO] [risk_manager]: 💾 Loaded Peak Equity: 1.00
+2025-12-06 23:19:58,906 [INFO] [risk_manager]: 💾 Loaded Current Equity: 1.00
+2025-12-06 23:19:58,906 [INFO] [risk_manager]: RiskManager daily reset loop started.
+2025-12-06 23:20:03,027 [INFO] [ml_strategy]: ✅ Successfully loaded model. Expects 38 features.
+2025-12-06 23:20:03,027 [INFO] [executor]: ✅ OrderExecutionManager initialized (Market Order Mode).
+2025-12-06 23:20:03,027 [INFO] [risk_manager]: RiskManager reset: Sleeping for 22197 seconds (until 00:00 UTC).
+2025-12-06 23:20:03,027 [INFO] [main]: 🩺 Health check server started on http://0.0.0.0:9090/healthz
+2025-12-06 23:20:03,027 [INFO] [ws_manager]: 🔌 Connecting to WS: wss://socket.india.delta.exchange
+2025-12-06 23:20:03,027 [INFO] [feature_engine]: 🔒 Acquired priming lock. Starting history fetch...
+2025-12-06 23:20:03,027 [INFO] [feature_engine]: Priming candle history for all symbols...
+2025-12-06 23:20:03,027 [INFO] [ml_strategy]: ▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...
+2025-12-06 23:20:03,027 [INFO] [executor]: ▶️ OrderExecutionManager starting (listening for signals)...
+2025-12-06 23:20:03,027 [INFO] [monitor]: 🚀 Position Monitor started - waiting for events
+2025-12-06 23:20:03,032 [INFO] [tsl_manager]: ▶️ TSLManager starting...
+2025-12-06 23:20:03,032 [INFO] [reconciler]: 🛡️ Reconciliation Service Started (Orphan Detection Active)
+2025-12-06 23:20:03,032 [INFO] [feature_engine]: 🌍 Starting Binance Data Poller...
+2025-12-06 23:20:03,040 [INFO] [feature_engine]: ✅ FeatureEngine subscribed to delta:raw:ws...
+2025-12-06 23:20:03,214 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 1m
+2025-12-06 23:20:03,511 [INFO] [feature_engine]: ✅ Primed 314 candles for BTCUSD 5m
+2025-12-06 23:20:04,030 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 15m
+2025-12-06 23:20:04,674 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 1h
+2025-12-06 23:20:04,732 [INFO] [ws_manager]: ✅ Connected to Delta WebSocket
+2025-12-06 23:20:04,732 [INFO] [ws_manager]: ❤️ Sent request to enable Delta WebSocket heartbeat.
+2025-12-06 23:20:04,734 [INFO] [ws_manager]: 📈 Subscribed to channels for ['BTCUSD', 'ETHUSD', 'SOLUSD']
+2025-12-06 23:20:04,734 [INFO] [ws_manager]: 🔐 Sent authentication payload to WebSocket
+2025-12-06 23:20:04,735 [INFO] [ws_manager]: 💓 Artificial Redis Heartbeat generator started.
+2025-12-06 23:20:04,737 [INFO] [ws_manager]: 👂 Listening to internal control channel: delta:control
+2025-12-06 23:20:05,075 [INFO] [feature_engine]: ✅ Primed 315 candles for BTCUSD 4h
+2025-12-06 23:20:05,395 [INFO] [feature_engine]: ✅ Primed 709 candles for BTCUSD 1d
+2025-12-06 23:20:05,439 [INFO] [ws_manager]: ✅ Authenticated successfully
+2025-12-06 23:20:05,439 [INFO] [ws_manager]: 🧠 Subscribed to private channels
+2025-12-06 23:20:05,694 [INFO] [feature_engine]: ✅ Primed 102 candles for BTCUSD 1w
+2025-12-06 23:20:05,986 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 1m
+2025-12-06 23:20:06,276 [INFO] [feature_engine]: ✅ Primed 314 candles for ETHUSD 5m
+2025-12-06 23:20:06,559 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 15m
+2025-12-06 23:20:06,863 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 1h
+2025-12-06 23:20:07,165 [INFO] [feature_engine]: ✅ Primed 315 candles for ETHUSD 4h
+2025-12-06 23:20:07,539 [INFO] [feature_engine]: ✅ Primed 670 candles for ETHUSD 1d
+2025-12-06 23:20:07,858 [INFO] [feature_engine]: ✅ Primed 97 candles for ETHUSD 1w
+2025-12-06 23:20:08,184 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 1m
+2025-12-06 23:20:08,620 [INFO] [feature_engine]: ✅ Primed 314 candles for SOLUSD 5m
+2025-12-06 23:20:08,909 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 15m
+2025-12-06 23:20:09,201 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 1h
+2025-12-06 23:20:09,501 [INFO] [feature_engine]: ✅ Primed 315 candles for SOLUSD 4h
+2025-12-06 23:20:09,832 [INFO] [feature_engine]: ✅ Primed 608 candles for SOLUSD 1d
+2025-12-06 23:20:10,142 [INFO] [feature_engine]: ✅ Primed 88 candles for SOLUSD 1w
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ Priming complete. Processing 160 buffered messages...
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ L2 Snapshot processed for BTCUSD (Seq: 7692760).
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ L2 Snapshot processed for ETHUSD (Seq: 8913656).
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ L2 Snapshot processed for SOLUSD (Seq: 4318184).
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ Trade snapshot processed for BTCUSD
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ Trade snapshot processed for ETHUSD
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ Trade snapshot processed for SOLUSD
+2025-12-06 23:20:10,263 [INFO] [feature_engine]: ✅ Message buffer processed. 🔓 Releasing lock. Now listening for live data.
+2025-12-06 23:20:10,279 [INFO] [feature_engine]: ✅ ETHUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:20:10,306 [INFO] [feature_engine]: ✅ BTCUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:20:10,800 [INFO] [feature_engine]: ✅ SOLUSD is now data-ready. Publishing enriched feed.
+2025-12-06 23:21:10,329 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:21:10,331 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:21:10,332 [INFO] [tsl_manager]: TSL Loop for BTCUSD started @ entry=89630.0000 (trail x1.00 floor=0.5000)
+2025-12-06 23:21:10,333 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:21:10,539 [INFO] [tsl_manager]: ✅ TSL active for BTCUSD: order_id=1072355470 type=limit_order
+2025-12-06 23:21:10,583 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.8717 type=limit_order
+2025-12-06 23:21:11,691 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.8717
+2025-12-06 23:21:16,745 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.8717 type=limit_order
+2025-12-06 23:21:17,670 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.8717
+2025-12-06 23:21:22,711 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.8717 type=limit_order
+2025-12-06 23:21:23,674 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.8717
+2025-12-06 23:21:28,704 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.8717 type=limit_order
+2025-12-06 23:21:29,629 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.8717
+2025-12-06 23:21:34,766 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:21:35,687 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:21:41,006 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:21:41,932 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:21:47,243 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:21:48,166 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:21:53,208 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:21:54,129 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:21:59,172 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:00,151 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:05,620 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:06,747 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:11,129 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:22:11,174 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:22:11,176 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:22:11,176 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:22:12,831 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:13,945 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:18,997 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:19,998 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:25,486 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:26,604 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:31,935 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:33,135 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:38,773 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:40,047 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:45,906 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:46,991 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:52,046 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:53,645 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:22:58,692 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:22:59,869 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:23:05,489 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:23:06,453 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:23:11,866 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:23:12,191 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:23:12,193 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:23:12,197 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:23:12,197 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:23:12,898 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:23:18,411 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:23:19,334 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:23:24,819 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.5383 type=limit_order
+2025-12-06 23:23:25,739 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.5383
+2025-12-06 23:23:30,838 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.0717 type=limit_order
+2025-12-06 23:23:32,137 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.0717
+2025-12-06 23:23:37,872 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.0050 type=limit_order
+2025-12-06 23:23:39,033 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.0050
+2025-12-06 23:23:44,130 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89544.0050 type=limit_order
+2025-12-06 23:23:45,212 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89544.0050
+2025-12-06 23:23:50,979 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89548.3717 type=limit_order
+2025-12-06 23:23:52,127 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89548.3717
+2025-12-06 23:23:57,854 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89548.8050 type=limit_order
+2025-12-06 23:23:59,021 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89548.8050
+2025-12-06 23:24:04,596 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:05,767 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:10,934 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:11,960 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:13,549 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:24:13,551 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:24:13,867 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:24:13,867 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:24:17,318 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:18,509 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:23,811 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:24,861 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:30,461 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:31,616 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:37,111 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:38,239 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:43,277 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:44,196 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:49,252 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:50,224 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:24:55,487 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89549.8050 type=limit_order
+2025-12-06 23:24:56,408 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89549.8050
+2025-12-06 23:25:01,462 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89561.1643 type=limit_order
+2025-12-06 23:25:02,387 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89561.1643
+2025-12-06 23:25:07,441 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:08,405 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:13,452 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:14,418 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:14,742 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:25:14,745 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:25:14,746 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:25:14,746 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:25:19,479 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:20,444 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:25,793 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:26,721 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:31,778 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:32,701 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:37,731 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:38,659 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:43,699 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:44,627 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:49,659 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:50,580 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:25:55,867 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:25:56,833 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:26:01,864 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:26:02,522 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:26:07,893 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89558.7643 type=limit_order
+2025-12-06 23:26:08,814 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89558.7643
+2025-12-06 23:26:13,874 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89557.9643 type=limit_order
+2025-12-06 23:26:14,841 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89557.9643
+2025-12-06 23:26:15,344 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:26:15,346 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:26:15,346 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:26:15,347 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:26:19,880 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89563.6310 type=limit_order
+2025-12-06 23:26:20,887 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89563.6310
+2025-12-06 23:26:26,162 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89566.1310 type=limit_order
+2025-12-06 23:26:27,085 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89566.1310
+2025-12-06 23:26:32,283 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:26:33,211 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:26:38,261 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:26:39,233 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:26:44,291 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:26:45,215 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:26:50,274 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:26:51,198 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:26:56,450 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:26:57,384 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:02,446 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:03,413 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:08,474 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:09,394 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:14,431 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:15,396 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:15,952 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:27:15,954 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:27:15,954 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:27:15,954 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:27:20,451 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:21,413 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:26,684 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:27,611 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:32,661 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:33,670 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:38,708 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:39,674 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:44,694 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:45,616 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:50,664 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:51,596 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:27:56,837 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:27:57,768 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:28:02,819 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89565.5310 type=limit_order
+2025-12-06 23:28:03,789 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89565.5310
+2025-12-06 23:28:08,844 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89570.9643 type=limit_order
+2025-12-06 23:28:09,769 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89570.9643
+2025-12-06 23:28:14,842 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89577.3977 type=limit_order
+2025-12-06 23:28:15,764 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89577.3977
+2025-12-06 23:28:16,558 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:28:16,560 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:28:16,562 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:28:16,562 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:28:20,814 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89590.0643 type=limit_order
+2025-12-06 23:28:21,818 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89590.0643
+2025-12-06 23:28:27,103 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89592.2977 type=limit_order
+2025-12-06 23:28:28,067 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89592.2977
+2025-12-06 23:28:33,137 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89594.2310 type=limit_order
+2025-12-06 23:28:34,068 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89594.2310
+2025-12-06 23:28:39,136 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89594.7310 type=limit_order
+2025-12-06 23:28:40,059 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89594.7310
+2025-12-06 23:28:45,513 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:28:46,475 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:28:51,522 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:28:52,446 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:28:57,725 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:28:58,746 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:03,783 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:04,706 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:09,752 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:10,675 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:15,721 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:16,644 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:17,180 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:29:17,182 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:29:17,184 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:29:17,184 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:29:21,698 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:22,625 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:27,851 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:28,811 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:33,860 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:34,779 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:40,080 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:41,006 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:46,056 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:46,974 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:52,036 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:52,999 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:29:58,345 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89595.1643 type=limit_order
+2025-12-06 23:29:59,274 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89595.1643
+2025-12-06 23:30:04,356 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89604.7424 type=limit_order
+2025-12-06 23:30:05,279 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89604.7424
+2025-12-06 23:30:10,809 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89607.0758 type=limit_order
+2025-12-06 23:30:11,732 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89607.0758
+2025-12-06 23:30:16,809 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89607.0758 type=limit_order
+2025-12-06 23:30:17,775 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89607.0758
+2025-12-06 23:30:17,874 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:30:17,876 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:30:17,877 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:30:17,877 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:30:22,838 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89607.0758 type=limit_order
+2025-12-06 23:30:23,806 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89607.0758
+2025-12-06 23:30:29,177 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89606.6758 type=limit_order
+2025-12-06 23:30:30,249 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89606.6758
+2025-12-06 23:30:35,296 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89606.6091 type=limit_order
+2025-12-06 23:30:36,219 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89606.6091
+2025-12-06 23:30:41,672 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89606.0758 type=limit_order
+2025-12-06 23:30:42,657 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89606.0758
+2025-12-06 23:30:47,698 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89604.0758 type=limit_order
+2025-12-06 23:30:48,625 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89604.0758
+2025-12-06 23:30:53,693 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89604.0091 type=limit_order
+2025-12-06 23:30:54,626 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89604.0091
+2025-12-06 23:30:59,880 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89604.0091 type=limit_order
+2025-12-06 23:31:00,915 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89604.0091
+2025-12-06 23:31:06,474 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:07,398 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:12,448 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:13,370 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:18,398 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:18,635 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:31:18,636 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:31:18,637 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:31:18,637 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:31:19,366 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:24,679 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:25,654 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:31,171 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:32,136 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:37,174 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.6091 type=limit_order
+2025-12-06 23:31:38,099 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.6091
+2025-12-06 23:31:43,145 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89603.3424 type=limit_order
+2025-12-06 23:31:44,070 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89603.3424
+2025-12-06 23:31:49,130 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89599.5424 type=limit_order
+2025-12-06 23:31:50,051 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89599.5424
+2025-12-06 23:31:55,109 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:31:56,102 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:01,367 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:02,293 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:07,348 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:08,273 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:13,321 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:14,247 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:19,275 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:32:19,277 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:32:19,278 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:32:19,278 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:32:19,304 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:20,229 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:25,278 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:26,239 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:31,541 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:32,470 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:37,530 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:38,452 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:43,524 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:44,452 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:49,508 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:50,473 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:32:55,523 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:32:56,450 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:01,717 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:02,690 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:07,764 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:08,696 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:13,754 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:14,680 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:19,724 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:19,882 [WARNING] [reconciler]: ⚠️ Orphan Position detected for BTCUSD. Adopting...
+2025-12-06 23:33:19,884 [INFO] [monitor]: 👀 Started monitoring BTCUSD. Active: {'BTCUSD'}
+2025-12-06 23:33:19,886 [INFO] [tsl_manager]: TSL already active for product_id=27
+2025-12-06 23:33:19,886 [INFO] [reconciler]: ✅ Adopted BTCUSD position. Size: 1.0, Entry: 89630.0
+2025-12-06 23:33:20,691 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:25,966 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:26,902 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:32,520 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:33,479 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:39,108 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:40,210 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:45,552 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89598.8758 type=limit_order
+2025-12-06 23:33:46,763 [INFO] [tsl_manager]: ✅ Stop order 1072355470 updated to 89598.8758
+2025-12-06 23:33:52,136 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89597.0758 type=limit_order
+2025-12-06 23:33:53,194 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'stop_price_change_not_supported', 'context': {'info': 'Order: 1072355470 is already triggered and stop price cannot be changed'}}, 'success': False}
+2025-12-06 23:33:53,194 [ERROR] [tsl_manager]: ❌ Failed to update stop order (HTTP 400, code=stop_price_change_not_supported): {'error': {'code': 'stop_price_change_not_supported', 'context': {'info': 'Order: 1072355470 is already triggered and stop price cannot be changed'}}, 'success': False}
+2025-12-06 23:33:58,633 [INFO] [tsl_manager]: PUT /v2/orders (stop edit) -> id=1072355470 price=89596.8091 type=limit_order
+2025-12-06 23:33:59,721 [WARNING] [api_client]: API Request to /v2/orders failed with status 400. Response: {'error': {'code': 'open_order_not_found'}, 'success': False}
+2025-12-06 23:33:59,721 [WARNING] [tsl_manager]: ⚠️ Stop-loss order 1072355470 not found. Position may be closed.
+2025-12-06 23:34:05,035 [INFO] [tsl_manager]: 🛑 Position marked as inactive for BTCUSD. Stopping TSL.
+2025-12-06 23:34:05,035 [INFO] [tsl_manager]: ✅ TSL stopped for BTCUSD
+2025-12-06 23:37:15,953 [INFO] [main]: 🛑 Main loop cancelled.
+2025-12-06 23:37:15,953 [INFO] [main]: 🔻 Shutting down all services...
+2025-12-06 23:37:15,953 [INFO] [reconciler]: 🛡️ Reconciliation Service Stopped
+2025-12-06 23:37:15,953 [INFO] [ws_manager]: WebSocketHandler cancelled.
+2025-12-06 23:37:15,953 [INFO] [ws_manager]: 🔻 Closing WebSocketManager...
+2025-12-06 23:37:15,953 [INFO] [ws_manager]: 🔻 WebSocketManager closed cleanly.
+2025-12-06 23:37:15,953 [INFO] [feature_engine]: FeatureEngine listener task cancelled.
+2025-12-06 23:37:15,953 [INFO] [ml_strategy]: ML Strategy cancelled.
+2025-12-06 23:37:15,966 [INFO] [executor]: OrderExecutionManager cancelled.
+2025-12-06 23:37:15,966 [INFO] [monitor]: Monitor cancelled.
+2025-12-06 23:37:15,966 [INFO] [monitor]: 🔻 Monitor stopped cleanly.
+2025-12-06 23:37:15,966 [INFO] [tsl_manager]: TSLManager cancelled.
+2025-12-06 23:37:15,966 [INFO] [ws_manager]: Control message handler cancelled.
+2025-12-06 23:37:15,966 [INFO] [feature_engine]: 🔻 FeatureEngine stopped cleanly.

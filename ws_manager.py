@@ -1,6 +1,6 @@
 # --- detla-bot/ws_manager.py ---
-# ✅ FIX: Added Artificial Heartbeat Loop to prevent Redis Idle Timeout (Error 10054)
-# ✅ FIX: Publishes dummy traffic to RAW_CHANNEL every 10s
+# ✅ OPTIMIZATION: Uses orjson for high-performance JSON handling
+# ✅ FIX: Artificial Heartbeat Loop (prevents Error 10054)
 
 import asyncio
 import json
@@ -8,6 +8,7 @@ import logging
 import time
 import aiohttp
 import redis.asyncio as aioredis
+import orjson # ✅ FAST JSON
 from config import (
     WS_URL, 
     RAW_CHANNEL, 
@@ -95,8 +96,8 @@ class WebSocketManager:
                     "type": "synthetic_heartbeat",
                     "timestamp": time.time()
                 }
-                # Publish to RAW_CHANNEL so FeatureEngine stays awake reading it
-                await self.redis.publish(RAW_CHANNEL, json.dumps(payload))
+                # Use orjson here
+                await self.redis.publish(RAW_CHANNEL, orjson.dumps(payload))
                 await asyncio.sleep(10) # Pulse every 10 seconds
             except asyncio.CancelledError:
                 break
@@ -114,7 +115,8 @@ class WebSocketManager:
             async for msg in pubsub.listen():
                 if msg.get("type") == "message":
                     try:
-                        data = json.loads(msg['data'])
+                        # Use orjson load
+                        data = orjson.loads(msg['data'])
                         command = data.get("command")
                         symbol = data.get("symbol")
                         
@@ -200,7 +202,6 @@ class WebSocketManager:
         await self.connect()
         
         control_task = asyncio.create_task(self._handle_control_messages())
-        # ✅ Start the heartbeat loop
         self._keepalive_task = asyncio.create_task(self._keepalive_loop())
         
         try:
@@ -214,6 +215,9 @@ class WebSocketManager:
                 
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     try:
+                        # Use standard json here as initial parse is safer with it for mixed types
+                        # orjson is strict. But let's stick to standard json for the initial wrapper
+                        # to be safe, then orjson for redis.
                         data = json.loads(msg.data)
                     except json.JSONDecodeError:
                         continue
@@ -235,9 +239,10 @@ class WebSocketManager:
 
                     try:
                         if msg_type in self.PRIVATE_CHANNELS:
-                            await self.redis.publish(PRIVATE_CHANNEL, json.dumps(data))
+                            await self.redis.publish(PRIVATE_CHANNEL, orjson.dumps(data))
                         elif msg_type not in ("subscriptions", "key-auth"):
-                            await self.redis.publish(RAW_CHANNEL, json.dumps(data))
+                            # ✅ Use orjson for heavy throughput
+                            await self.redis.publish(RAW_CHANNEL, orjson.dumps(data))
                     except Exception as e:
                         logger.error(f"❌ Redis publish failed: {e}")
 
