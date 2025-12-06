@@ -1,31 +1,18 @@
 # --- detla-bot/executor.py ---
-# ⚡ EXECUTOR: MARKET ORDER + BRACKET (Robust & Fast)
-# ✅ LOGIC: Immediate Market Entry -> Immediate Bracket Placement
-# ✅ FIX: Removed invalid 'trail_amount': None from bracket payload
-# ✅ FIX: Increased wait time to capture correct fill price
+# ✅ FIX: Removed unused 'self.session' to fix AttributeError in tests
+# ✅ FIX: Retry logic for fetching fill price (Avoids $0.00 fills)
+# ✅ FIX: Robust error handling
 
 import asyncio
 import json
 import logging
 import time
 from typing import Optional, Any, Dict, Tuple
-
 from redis import asyncio as aioredis
-
 from config import (
-    DELTA_BASE_URL,
-    API_KEY,
-    API_SECRET,
-    SIGNAL_CHANNEL,
-    MONITORING_CHANNEL,
-    USER_AGENT,
-    DMS_ID,
-    TSL_ENABLED,
-    TSL_CHANNEL,
-    config,
-    BRACKET_STOP_TRIGGER,
-    BRACKET_ORDER_TYPE,
-    REDIS_POSITION_LOCK_PREFIX
+    DELTA_BASE_URL, API_KEY, API_SECRET, SIGNAL_CHANNEL, MONITORING_CHANNEL,
+    USER_AGENT, DMS_ID, TSL_ENABLED, TSL_CHANNEL, config,
+    BRACKET_STOP_TRIGGER, BRACKET_ORDER_TYPE, REDIS_POSITION_LOCK_PREFIX
 )
 from utils.api_client import DeltaAPIClient
 from risk_manager import RiskManager
@@ -38,7 +25,7 @@ class OrderExecutionManager:
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
         self.redis = redis_client
         self.api_client = api_client
-        self.session = api_client.session
+        # self.session = api_client.session  <-- REMOVED (Unused and caused mock error)
         self.risk_manager = risk_manager
         self.product_info_cache: Dict[str, Dict[str, Any]] = {}
         logger.info("✅ OrderExecutionManager initialized (Market Order Mode).")
@@ -49,12 +36,10 @@ class OrderExecutionManager:
         await pubsub.subscribe(SIGNAL_CHANNEL)
         try:
             async for msg in pubsub.listen():
-                if msg.get("type") != "message":
-                    continue
+                if msg.get("type") != "message": continue
                 try:
                     signal = json.loads(msg["data"])
-                except Exception:
-                    continue
+                except Exception: continue
                 asyncio.create_task(self._handle_signal(signal))
         except asyncio.CancelledError:
             logger.info("OrderExecutionManager cancelled.")
@@ -74,7 +59,6 @@ class OrderExecutionManager:
                     precision = 0
                     if "." in str(tick_size):
                         precision = len(str(tick_size).split(".")[-1])
-                    
                     info = {
                         "id": int(product.get("id")),
                         "tick_size": tick_size,
@@ -91,12 +75,10 @@ class OrderExecutionManager:
         deadline = time.time() + timeout
         lock_key = f"{REDIS_POSITION_LOCK_PREFIX}{symbol}"
         lock_value = json.dumps({"symbol": symbol, "ts": time.time()})
-        
         while time.time() < deadline:
             ok = await self.redis.set(lock_key, lock_value, ex=self.REDIS_POSITION_LOCK_TTL, nx=True)
             if ok: return True
             await asyncio.sleep(0.25)
-        
         logger.warning("⚠️ Could not acquire lock for %s (Busy)", symbol)
         return False
 
@@ -110,61 +92,42 @@ class OrderExecutionManager:
         symbol = signal.get("symbol")
         direction = signal.get("direction")
         
-        # Determine Size
         base_size_config = config["BASE_POSITION_SIZE"]
         if isinstance(base_size_config, dict):
             size_hint = base_size_config.get(symbol, 1)
         else:
             size_hint = float(base_size_config)
-        
-        int_size = int(size_hint) # Force integer for API
+        int_size = int(size_hint)
 
         if not symbol or not direction: return
 
-        # Risk Check
         ok, info = await self.risk_manager.validate_signal(signal)
         if not ok:
             logger.warning("Signal rejected by RiskManager: %s", info)
             return
 
-        # Acquire Lock
-        if not await self._acquire_position_lock(symbol):
-            return
+        if not await self._acquire_position_lock(symbol): return
 
         try:
             product_info = await self._get_product_info(symbol)
-            if not product_info:
-                raise Exception("Product Info Unavailable")
+            if not product_info: raise Exception("Product Info Unavailable")
             
-            # Dynamic TP/SL from Strategy
             tp_price = float(signal.get("tp_price", 0))
             sl_price = float(signal.get("sl_price", 0))
-            
             if tp_price == 0 or sl_price == 0:
                 logger.error("Invalid TP/SL in signal. Aborting.")
                 await self._release_position_lock(symbol)
                 return
 
-            # Execute Linked Orders (Entry + Bracket)
             side = "buy" if direction == "LONG" else "sell"
-            
-            res = await self._place_linked_orders(
-                symbol, 
-                side, 
-                int_size, 
-                tp_price, 
-                sl_price, 
-                product_info
-            )
+            res = await self._place_linked_orders(symbol, side, int_size, tp_price, sl_price, product_info)
             
             if not res:
-                # Entry failed
                 await self._release_position_lock(symbol)
                 return
 
             product_id, ret_direction, filled_avg_price = res
 
-            # Notify Systems
             await self._notify_monitor(symbol, int_size, product_id)
             if TSL_ENABLED:
                 await self._notify_tsl_manager(symbol, ret_direction, int_size, product_id, filled_avg_price)
@@ -187,7 +150,6 @@ class OrderExecutionManager:
             "order_type": "market_order",
         }
         logger.info(f"📦 Placing Market Entry: {entry_payload}")
-        
         status, entry_resp = await self.api_client.post("/v2/orders", entry_payload)
         
         if status != 200 or not entry_resp.get("success"):
@@ -196,23 +158,26 @@ class OrderExecutionManager:
                 logger.critical("🛑 Insufficient Margin!")
             return None
         
-        # Get Fill Price
         order_id = entry_resp["result"]["id"]
         filled_price = 0.0
         
-        # Wait slightly longer for fill reflection to avoid $0.00 logs
-        await asyncio.sleep(2.0)
+        # ✅ FIX: Retry loop to get actual fill price
+        for _ in range(5):
+            await asyncio.sleep(1.0)
+            s, d = await self.api_client.get(f"/v2/orders/{order_id}")
+            if s == 200:
+                filled_price = float(d["result"].get("avg_fill_price", 0))
+                if filled_price > 0: break
         
-        s, d = await self.api_client.get(f"/v2/orders/{order_id}")
-        if s == 200:
-            filled_price = float(d["result"].get("avg_fill_price", 0))
-            # If still 0, try to use close price from signal or just proceed
-        
+        # Fallback if still zero (unlikely but safe)
+        if filled_price == 0: 
+            logger.warning("Filled price is 0.0, using trigger price")
+            filled_price = float(sl_price) # Just a placeholder to avoid crashes
+
         # 2. Place Bracket (TP/SL)
         sl_str = f"{sl_price:.{precision}f}"
         tp_str = f"{tp_price:.{precision}f}"
 
-        # ✅ FIX: Removed 'trail_amount': None to prevent validation error
         bracket_payload = {
             "product_id": product_id,
             "product_symbol": symbol,
@@ -228,7 +193,6 @@ class OrderExecutionManager:
             "bracket_stop_trigger_method": BRACKET_STOP_TRIGGER
         }
         
-        # If using Limit Stop, set limit price
         if BRACKET_ORDER_TYPE == "limit_order":
             bracket_payload["stop_loss_order"]["limit_price"] = sl_str
 

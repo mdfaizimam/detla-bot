@@ -1,6 +1,6 @@
 # --- detla-bot/monitor.py ---
-# Tracks open positions and releases the lock when they close.
-# ⚡ UPGRADE: Releases Symbol-Specific locks for Multi-Symbol Concurrency.
+# ✅ FIXED: "PnL Erasure" Bug - Calls risk_manager.sync_equity() on position close
+# ✅ ROBUST: Uses exchange wallet balance instead of guessing PnL
 
 import asyncio
 import json
@@ -10,8 +10,7 @@ from utils.api_client import DeltaAPIClient
 from config import (
     MONITORING_CHANNEL, 
     PRIVATE_CHANNEL, 
-    REDIS_POSITION_LOCK_PREFIX, # ✅ NEW
-    TRADING_SYMBOLS
+    REDIS_POSITION_LOCK_PREFIX
 )
 from risk_manager import RiskManager
 
@@ -23,16 +22,11 @@ class PositionMonitor:
         self.api_client = api_client
         self.risk_manager = risk_manager
         
-        # Tracks which symbols are currently active
         self.active_symbols = set()
         self._stop_event = asyncio.Event()
 
     async def start(self):
         logger.info("🚀 Position Monitor started - waiting for events")
-        
-        # We listen to two channels:
-        # 1. MONITORING_CHANNEL (from Executor): Tells us "I just opened a trade on XYZ"
-        # 2. PRIVATE_CHANNEL (from WSManager): Gives us live updates on "v2/user_trades" and "positions"
         
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(MONITORING_CHANNEL, PRIVATE_CHANNEL)
@@ -43,7 +37,10 @@ class PositionMonitor:
                 if msg.get("type") != "message": continue
                 
                 channel = msg.get("channel")
-                data = json.loads(msg.get("data"))
+                try:
+                    data = json.loads(msg.get("data"))
+                except:
+                    continue
                 
                 if channel == MONITORING_CHANNEL:
                     await self._handle_new_position(data)
@@ -60,7 +57,6 @@ class PositionMonitor:
         self._stop_event.set()
 
     async def _handle_new_position(self, data: dict):
-        """Executor says: 'I opened a position on BTCUSD'."""
         msg_type = data.get("type")
         if msg_type == "start_monitoring":
             symbol = data.get("symbol")
@@ -69,65 +65,57 @@ class PositionMonitor:
                 logger.info(f"👀 Started monitoring {symbol}. Active: {self.active_symbols}")
 
     async def _handle_private_update(self, data: dict):
-        """Process WebSocket updates to detect position closure."""
+        # We look for user_trades (fills) or position updates to trigger a check
         msg_type = data.get("type")
         
-        # 1. Check 'positions' updates (Balance updates)
-        if msg_type == "positions":
-            # This stream often sends the full list of positions or updates
-            # We check if our active symbols have size=0 here
-            pass # Implementation often complex, usually user_trades is faster for close detection
+        if msg_type == "v2/user_trades":
+            symbol = data.get("sy") # v2 channel uses short keys
+            if not symbol: symbol = data.get("symbol")
             
-        # 2. Check 'v2/user_trades' (Real-time executions)
-        elif msg_type == "v2/user_trades":
-            symbol = data.get("symbol")
-            size = float(data.get("size", 0))
-            side = data.get("side")
-            
-            # If we see a trade, we need to check if it CLOSED our position.
-            # The simplest way is: If we are monitoring this symbol, query the API to confirm we are flat.
+            # If we see a trade for an active symbol, check if it closed the position
             if symbol in self.active_symbols:
-                await self._verify_flat_status(symbol)
+                asyncio.create_task(self._verify_flat_status(symbol))
 
     async def _verify_flat_status(self, symbol: str):
         """
-        Queries the API to check if the position size is effectively zero.
-        If zero, releases the lock.
+        Queries the API to check if the position is closed.
+        If closed, syncs equity and releases lock.
         """
-        # Add a small delay to ensure the exchange backend has settled
-        await asyncio.sleep(1.0) 
+        await asyncio.sleep(1.5) # Wait for backend settlement
         
+        # GET /positions returns open positions
         status, response = await self.api_client.get("/v2/positions", params={"underlying_asset_symbol": symbol})
         
         if status == 200:
             positions = response.get("result", [])
-            # Find position for this symbol
-            # Delta often returns a list. Since we queried by symbol, should be short.
             
-            size = 0.0
-            pnl = 0.0
+            # Check if our symbol is present with non-zero size
+            # If position is CLOSED, it is often removed from the list entirely
+            is_open = False
+            current_size = 0.0
             
             for p in positions:
-                # Double check symbol match (API sometimes returns all if filter fails)
-                if p.get("product_symbol") == symbol or p.get("underlying_asset_symbol") == symbol:
-                    size = float(p.get("size", 0))
-                    pnl = float(p.get("realized_pnl", 0)) # Note: this is cumulative for the session often
-                    
-            if size == 0:
-                logger.info(f"✅ Position closed for {symbol}. Releasing lock.")
-                await self._release_lock(symbol, pnl)
+                p_sym = p.get("product_symbol") or p.get("symbol")
+                if p_sym == symbol:
+                    current_size = float(p.get("size", 0))
+                    if current_size != 0:
+                        is_open = True
+            
+            if not is_open or current_size == 0:
+                logger.info(f"✅ Position closed for {symbol}. Syncing Equity & Releasing lock.")
+                
+                # ✅ FIX: Sync Equity directly from API to capture exact PnL
+                await self.risk_manager.sync_equity()
+                
+                await self._release_lock(symbol)
             else:
-                logger.debug(f"Position still open for {symbol}: Size {size}")
+                logger.debug(f"Position still open for {symbol}: Size {current_size}")
 
-    async def _release_lock(self, symbol: str, pnl: float):
+    async def _release_lock(self, symbol: str):
         if symbol in self.active_symbols:
             self.active_symbols.remove(symbol)
             
-        # ⚡ UPGRADE: Release specific lock key
         lock_key = f"{REDIS_POSITION_LOCK_PREFIX}{symbol}"
         await self.redis.delete(lock_key)
         
-        # Update Risk Manager with PnL
-        await self.risk_manager.update_pnl(pnl)
-        
-        logger.info(f"🔓 Lock released for {symbol}. PnL recorded.")
+        logger.info(f"🔓 Lock released for {symbol}.")

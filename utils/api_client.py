@@ -1,7 +1,7 @@
 # --- detla-bot/utils/api_client.py ---
-# FIX: Added missing 'delete' method for cancelling orders
-# FIX: Kills bot on "IP not whitelisted" error
-# FIX: Correctly builds the unencoded query string for signature
+# ✅ FIXED: DELETE method now correctly uses 'payload' for JSON body (Required for Delta API)
+# ✅ FIXED: Kills bot on "IP not whitelisted" error
+# ✅ FIXED: Robust signature generation
 
 import asyncio
 import json
@@ -53,6 +53,7 @@ class DeltaAPIClient:
         if params:
             query_string_for_sig = "?" + "&".join([f"{k}={v}" for k, v in params.items()])
 
+        # Delta expects JSON body for POST/PUT/DELETE
         body = json.dumps(payload, separators=(',', ':'), sort_keys=True) if payload else ""
         
         url = f"{self.base_url}{path}"
@@ -64,7 +65,7 @@ class DeltaAPIClient:
                     method, 
                     path, 
                     body, 
-                    query_string_for_sig, # Pass the unencoded string
+                    query_string_for_sig, 
                     self.api_key, 
                     self.api_secret
                 )
@@ -138,7 +139,7 @@ class DeltaAPIClient:
         """Perform an authenticated PUT request."""
         return await self._request("PUT", path, params=None, payload=payload)
 
-    # ✅ ADDED DELETE METHOD
-    async def delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+    # ✅ FIXED: DELETE uses payload (body), not params (query string) for Delta API
+    async def delete(self, path: str, payload: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
         """Perform an authenticated DELETE request."""
-        return await self._request("DELETE", path, params=params, payload=None)
+        return await self._request("DELETE", path, params=None, payload=payload)
