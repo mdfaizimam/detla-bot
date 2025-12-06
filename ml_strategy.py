@@ -1,9 +1,8 @@
 # --- detla-bot/ml_strategy.py ---
-# COMPLETE UPDATED FILE (UNABRIDGED)
-# ✅ FIX: Dynamic Feature Alignment (Model Safety)
-# ✅ NEW: Hybrid Strategy (ML for Trend + Mean Reversion for Chop)
-# ✅ NEW: Dynamic Confidence Thresholds (Recall Booster)
-# ✅ MAINTAINED: Full Filter Logic (Trend, Vol, Funding, SNR)
+# 🧠 STRATEGY: Fixed ATR-based SL + Dynamic SNR-based TP
+# ✅ SL: Strictly ATR-based (Safety first)
+# ✅ TP: Dynamic (Targets Liquidity/Pivots if R:R is good)
+# ✅ FIX: Added missing 'Tuple' import
 
 import asyncio
 import json
@@ -12,8 +11,9 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Set, Tuple # ✅ Added Tuple here
 import time 
+import warnings 
 
 from redis import asyncio as aioredis
 
@@ -21,7 +21,6 @@ from config import (
     ENRICHED_CHANNEL, 
     SIGNAL_CHANNEL, 
     TRADING_SYMBOLS, 
-    BASE_POSITION_SIZE,
     SIGNAL_CONFIDENCE,
     config
 )
@@ -63,7 +62,7 @@ class MLForecastingStrategy:
 
     async def start(self, risk_manager: RiskManager):
         if not self.model: return
-        log.info("▶️ Hybrid Strategy Engine Starting (ML + Mean Reversion)...")
+        log.info("▶️ Hybrid Strategy Engine Starting (ATR SL / SNR TP)...")
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(ENRICHED_CHANNEL)
         try:
@@ -78,7 +77,6 @@ class MLForecastingStrategy:
         if not symbol: return
         if risk_manager.circuit_open: return
 
-        # Stale Data Check
         try:
             if self.config["TREND_CHECK_ENABLED"]:
                 now_ts = data['timestamp'] / 1_000_000
@@ -88,121 +86,229 @@ class MLForecastingStrategy:
 
         async with self._strategy_lock:
             if (time.time() - self.last_signal_ts[symbol]) < self.signal_cooldown: return
-            
-            # 🧠 CORE LOGIC SWITCHER
-            signal_payload = await self._evaluate_market_regime(data)
+
+            if not self._gatekeeper_check(data):
+                return
+
+            allowed_directions = self._get_allowed_directions(data)
+            if not allowed_directions: return
+
+            signal_payload = await self._evaluate_market_regime(data, allowed_directions)
             
             if signal_payload:
                 self.last_signal_ts[symbol] = time.time()
                 await self.redis.publish(SIGNAL_CHANNEL, json.dumps(signal_payload))
-                log.info(f"🚀 Published {signal_payload['direction']} ({signal_payload['strategy']}) for {symbol}")
+                log.info(f"🚀 Published {signal_payload['direction']} ({signal_payload['strategy']}) Size: {signal_payload['size_hint']} for {symbol}")
 
-    async def _evaluate_market_regime(self, data: dict) -> Optional[Dict]:
-        """Decides whether to use ML (Trend) or Mean Reversion (Chop)."""
+    def _calculate_smart_size(self, symbol: str, confidence: float) -> float:
+        base_sizes = self.config["BASE_POSITION_SIZE"]
+        base_size = base_sizes.get(symbol, 0.001)
+        
+        if not self.config.get("ENABLE_SMART_SIZING", False):
+            return base_size
+            
+        floor = self.config["CONFIDENCE_FLOOR"]
+        ceiling = self.config["CONFIDENCE_CEILING"]
+        min_mult = self.config["MIN_SIZE_MULTIPLIER"]
+        max_mult = self.config["MAX_SIZE_MULTIPLIER"]
+        
+        conf = max(floor, min(confidence, ceiling))
+        scaler = (conf - floor) / (ceiling - floor) if ceiling != floor else 1.0
+        multiplier = min_mult + (scaler * (max_mult - min_mult))
+        smart_size = base_size * multiplier
+        
+        return round(smart_size, 4)
+
+    def _gatekeeper_check(self, data: dict) -> bool:
+        if not self.config.get("GATEKEEPER_ENABLED", True): return True
+        
         symbol = data.get("symbol")
+        if self.config["VOLUME_CHECK_ENABLED"]:
+            tf = self.config["VOLUME_TIMEFRAME"]
+            tas = data.get("tas", {}).get(tf, {})
+            vol = tas.get("volume", 0)
+            vol_sma = tas.get(f"SMA_volume_{self.config['VOLUME_SMA_PERIOD']}", 0)
+            threshold_mult = self.config.get("GATEKEEPER_VOL_THRESHOLD", 0.25)
+            
+            if vol_sma > 0 and vol < (vol_sma * threshold_mult):
+                return False
+        return True
+
+    def _get_allowed_directions(self, data: dict) -> Set[str]:
+        allowed = {'LONG', 'SHORT'}
+        if self.config["TREND_CHECK_ENABLED"]:
+            try:
+                tf = self.config["TREND_TIMEFRAME"]
+                tas = data.get("tas", {}).get(tf, {})
+                ema20 = tas.get("ema_20")
+                ema50 = tas.get("ema_50")
+                if ema20 and ema50:
+                    if ema20 > ema50: allowed.discard('SHORT')
+                    elif ema20 < ema50: allowed.discard('LONG')
+            except Exception: pass
+
+        if self.config["FUNDING_CHECK_ENABLED"]:
+            try:
+                funding_rate = float(data.get("funding_rate", 0))
+                threshold = self.config["FUNDING_RATE_THRESHOLD"]
+                if funding_rate > threshold: allowed.discard('LONG')
+                elif funding_rate < -threshold: allowed.discard('SHORT')
+            except Exception: pass
+            
+        return allowed
+
+    async def _evaluate_market_regime(self, data: dict, allowed_directions: Set[str]) -> Optional[Dict]:
         tas = data.get("tas", {}).get("5m", {})
         ker = tas.get("ker", 0.5)
-        
-        # Threshold for Chop vs Trend
         chop_threshold = self.config.get("MR_KER_THRESHOLD", 0.25)
         
         if ker < chop_threshold and self.config.get("MEAN_REVERSION_ENABLED"):
-            # REGIME: CHOP -> Use Mean Reversion
-            return self._run_mean_reversion_strategy(data, tas)
+            return self._run_mean_reversion_strategy(data, tas, allowed_directions)
         else:
-            # REGIME: TREND -> Use ML Model
-            return self._run_ml_strategy(data, tas, ker)
+            return self._run_ml_strategy(data, tas, ker, allowed_directions)
 
-    # ------------------------------------------------------------------
-    # 1. MEAN REVERSION STRATEGY (The "Chop" Fix)
-    # ------------------------------------------------------------------
-    def _run_mean_reversion_strategy(self, data: dict, tas: dict) -> Optional[Dict]:
+    def _run_mean_reversion_strategy(self, data: dict, tas: dict, allowed_directions: Set[str]) -> Optional[Dict]:
         symbol = data.get("symbol")
         price = float(data.get("mid_price", 0))
         rsi = tas.get("rsi_14", 50)
         bb_lower = tas.get("bb_lower")
         bb_upper = tas.get("bb_upper")
-        obi = float(data.get("imbalance", 0)) # Order Flow
+        obi = float(data.get("imbalance", 0)) 
         
         if not bb_lower or not bb_upper: return None
         
         direction = None
+        if 'LONG' in allowed_directions:
+            if price < bb_lower and rsi < self.config["MR_RSI_OVERSOLD"] and obi > -0.5: direction = "LONG"
         
-        # LONG CONDITION: Price < Low BB + RSI Oversold + Order Book Support
-        if price < bb_lower and rsi < self.config["MR_RSI_OVERSOLD"]:
-            if obi > -0.5: # ✅ Order Flow Check: Don't catch falling knife if book is empty
-                direction = "LONG"
-        
-        # SHORT CONDITION: Price > High BB + RSI Overbought + Order Book Resistance
-        elif price > bb_upper and rsi > self.config["MR_RSI_OVERBOUGHT"]:
-            if obi < 0.5: 
-                direction = "SHORT"
+        if 'SHORT' in allowed_directions and not direction:
+            if price > bb_upper and rsi > self.config["MR_RSI_OVERBOUGHT"] and obi < 0.5: direction = "SHORT"
                 
         if direction:
-            log.info(f"🎯 MR Signal: {symbol} {direction} (RSI={rsi:.1f}, Price vs BB)")
             atr = tas.get("atr", price * 0.005)
-            
-            # Tighter Stops for Mean Reversion
-            sl_dist = atr * 1.5
+            # Use Standard ATR for Mean Reversion as well
+            sl_dist = atr * self.config["SL_ATR_MULTIPLIER"] 
             tp_dist = sl_dist * self.config["MR_RISK_REWARD"]
-            
             sl = price - sl_dist if direction == "LONG" else price + sl_dist
             tp = price + tp_dist if direction == "LONG" else price - tp_dist
             
+            size = self._calculate_smart_size(symbol, 0.85)
+            
             return {
-                "symbol": symbol, "direction": direction, "confidence": 0.85, # Fixed high conf for MR
-                "size_hint": self.config["BASE_POSITION_SIZE"], "trigger_price": price,
-                "tp_price": tp, "sl_price": sl, "atr": atr, "strategy": "MEAN_REVERSION"
+                "symbol": symbol, "direction": direction, "confidence": 0.85, 
+                "size_hint": size, 
+                "trigger_price": price, "tp_price": tp, "sl_price": sl, 
+                "atr": atr, "strategy": "MEAN_REVERSION"
             }
         return None
 
-    # ------------------------------------------------------------------
-    # 2. ML TREND STRATEGY (The "Sniper")
-    # ------------------------------------------------------------------
-    def _run_ml_strategy(self, data: dict, tas: dict, ker: float) -> Optional[Dict]:
+    def _run_ml_strategy(self, data: dict, tas: dict, ker: float, allowed_directions: Set[str]) -> Optional[Dict]:
         symbol = data.get("symbol")
         features_df, _ = self._prepare_features(data)
         if features_df is None: return None
         
         try:
-            probs = self.model.predict_proba(features_df)[0]
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*feature names.*")
+                probs = self.model.predict_proba(features_df)[0]
+            
             pred_idx = np.argmax(probs)
             conf = probs[pred_idx]
             direction = TARGET_MAP.get(pred_idx, "NEUTRAL")
-        except: return None
+        except Exception as e:
+            log.error(f"ML Prediction Error: {e}")
+            return None
         
-        if direction == "NEUTRAL": return None
+        if direction == "NEUTRAL" or direction not in allowed_directions: return None
         
-        # ✅ DYNAMIC CONFIDENCE CALCULATION
         required_conf = self.config["BASE_CONFIDENCE"]
         if self.config["DYNAMIC_CONFIDENCE_ENABLED"]:
-            bb_width = tas.get("bb_width", 0.02) # Default 2%
+            bb_width = tas.get("bb_width", 0.02) 
             adjustment = bb_width * self.config["VOLATILITY_SCALER"]
             required_conf = max(self.config["MIN_CONFIDENCE"], required_conf - adjustment)
             
-        if conf < required_conf:
-            return None
+        if conf < required_conf: return None
             
         log.info(f"🎯 ML Signal: {symbol} {direction} (Conf: {conf:.2f} >= {required_conf:.2f})")
         
-        if not self._check_confirmation_filters(data, direction):
-            return None
-
         price = float(data['mid_price'])
         atr = tas.get("atr", price * 0.01)
+        
+        # --- ✅ 1. STRICT ATR-BASED STOP LOSS ---
         sl_dist = atr * self.config["SL_ATR_MULTIPLIER"]
-        tp_dist = sl_dist * self.config["MIN_RISK_REWARD_RATIO"]
         
-        sl = price - sl_dist if direction == "LONG" else price + sl_dist
-        tp = price + tp_dist if direction == "LONG" else price - tp_dist
+        if direction == "LONG":
+            sl = price - sl_dist
+        else:
+            sl = price + sl_dist
+            
+        # --- ✅ 2. DYNAMIC SNR-BASED TAKE PROFIT ---
+        # We look for PMH/PML or Pivot levels to set a better TP
+        pml = data.get("PML") # Prev Day Low
+        pmh = data.get("PMH") # Prev Day High
+        daily_tas = data.get("tas", {}).get("1d", {})
+        pivot_r1 = daily_tas.get("R1")
+        pivot_s1 = daily_tas.get("S1")
         
-        if not self._check_risk_reward(price, sl, tp, direction):
-            return None
+        min_rr = self.config["MIN_RISK_REWARD_RATIO"]
+        min_tp_dist = sl_dist * min_rr
+        
+        tp = 0.0
+        
+        if direction == "LONG":
+            # Default TP (ATR based)
+            default_tp = price + min_tp_dist
+            
+            # Dynamic Candidates: Resistance 1 or Prev Day High
+            candidates = []
+            if pivot_r1 and pivot_r1 > price: candidates.append(pivot_r1)
+            if pmh and pmh > price: candidates.append(pmh)
+            
+            # Find closest candidate that satisfies Min R:R
+            valid_snr_tp = None
+            for cand in sorted(candidates):
+                if cand >= default_tp:
+                    valid_snr_tp = cand
+                    break # Take the first one that is profitable enough
+            
+            if valid_snr_tp:
+                tp = valid_snr_tp
+                log.info(f"🎯 Using Dynamic SNR for TP: {tp} (Default was {default_tp})")
+            else:
+                tp = default_tp
+                
+        else: # SHORT
+            # Default TP
+            default_tp = price - min_tp_dist
+            
+            # Dynamic Candidates: Support 1 or Prev Day Low
+            candidates = []
+            if pivot_s1 and pivot_s1 < price: candidates.append(pivot_s1)
+            if pml and pml < price: candidates.append(pml)
+            
+            # Find closest candidate (highest lower than price) that satisfies Min R:R
+            valid_snr_tp = None
+            for cand in sorted(candidates, reverse=True):
+                if cand <= default_tp:
+                    valid_snr_tp = cand
+                    break
+            
+            if valid_snr_tp:
+                tp = valid_snr_tp
+                log.info(f"🎯 Using Dynamic SNR for TP: {tp} (Default was {default_tp})")
+            else:
+                tp = default_tp
+
+        # Final check
+        if not self._check_risk_reward(price, sl, tp, direction): return None
+
+        size = self._calculate_smart_size(symbol, float(conf))
 
         return {
             "symbol": symbol, "direction": direction, "confidence": float(conf),
-            "size_hint": self.config["BASE_POSITION_SIZE"], "trigger_price": price,
-            "tp_price": tp, "sl_price": sl, "atr": atr, "strategy": "ML_TREND",
+            "size_hint": size, 
+            "trigger_price": price, "tp_price": tp, "sl_price": sl, 
+            "atr": atr, "strategy": "ML_TREND",
             "candles": list(data.get("tas", {}).get("1m", {}).values())
         }
 
@@ -213,7 +319,8 @@ class MLForecastingStrategy:
         features = {
             "EMA_8": tas.get('ema_20', 0), "EMA_21": tas.get('ema_20', 0),
             "EMA_50": tas.get('ema_50', 0), "KER": tas.get('ker', 0.5),
-            "FRACTAL_DIM": 1.5, "BB_WIDTH": tas.get('bb_width', 0),
+            "FRACTAL_DIM": tas.get('fractal_dim', 1.0), 
+            "BB_WIDTH": tas.get('bb_width', 0),
             "RSI": tas.get('rsi_14', 50), "MACDh": tas.get('macd_hist', 0),
             "ATR": tas.get('atr', 0), "OBV": tas.get('obv', 0), "ADX": tas.get('adx', 0),
             "OBI_Proxy": data.get('imbalance', 0),
@@ -224,11 +331,9 @@ class MLForecastingStrategy:
         }
         df = pd.DataFrame([features])
         
-        # Synthetic Lags
         for col in ['KER', 'RSI', 'MACDh', 'OBV', 'ADX', 'OBI_Proxy', 'funding_rate', 'long_short_ratio']:
             for lag in [1, 3, 5]: df[f'{col}_LAG{lag}'] = features.get(col, 0)
 
-        # Dynamic Alignment
         if hasattr(self.model, "feature_names_in_"):
             req_cols = self.model.feature_names_in_
             for c in req_cols: 
@@ -236,68 +341,6 @@ class MLForecastingStrategy:
             df = df[list(req_cols)]
             
         return df, None
-
-    def _check_confirmation_filters(self, data: dict, direction: str) -> bool:
-        """
-        Checks Trend, Funding, Volume, and S/R filters.
-        """
-        symbol = data.get("symbol", "N/A")
-        
-        # --- 1. Trend Filter ---
-        if self.config["TREND_CHECK_ENABLED"]:
-            try:
-                tf = self.config["TREND_TIMEFRAME"]
-                tas = data.get("tas", {}).get(tf, {})
-                if not tas.get("ema_20") or not tas.get("ema_50"):
-                    pass # Skip if data missing
-                else:
-                    is_uptrend = tas["ema_20"] > tas["ema_50"]
-                    if direction == "LONG" and not is_uptrend: return False
-                    if direction == "SHORT" and is_uptrend: return False
-            except Exception: pass
-
-        # --- 2. Funding Rate Filter ---
-        if self.config["FUNDING_CHECK_ENABLED"]:
-            try:
-                funding_rate = float(data.get("funding_rate", 0))
-                threshold = self.config["FUNDING_RATE_THRESHOLD"]
-                if direction == "LONG" and funding_rate > threshold: return False
-                if direction == "SHORT" and funding_rate < -threshold: return False
-            except Exception: pass
-
-        # --- 3. Volume Filter ---
-        if self.config["VOLUME_CHECK_ENABLED"]:
-            try:
-                tf = self.config["VOLUME_TIMEFRAME"]
-                multiplier = self.config["VOLUME_SURGE_MULTIPLIER"]
-                tas = data.get("tas", {}).get(tf, {})
-                vol = tas.get("volume", 0)
-                vol_sma = tas.get(f"SMA_volume_{self.config['VOLUME_SMA_PERIOD']}", 0)
-                if vol_sma > 0 and vol < (vol_sma * 0.5): # Relaxed check
-                     pass 
-            except Exception: pass
-                
-        # --- 4. S/R Filter ---
-        if self.config["SNR_CHECK_ENABLED"]:
-            try:
-                price = float(data['mid_price'])
-                proximity_pct = self.config["SNR_PROXIMITY_PCT"]
-                levels = [data.get("PWH"), data.get("PWL")]
-                for level in levels:
-                    if level is None: continue
-                    if abs(price - level) / price < proximity_pct: return False
-            except Exception: pass
-
-        return True 
-
-    def _calculate_sl_tp(self, entry_price: float, atr: float, direction: str) -> Tuple[float, float]:
-        sl_dist = atr * self.config["SL_ATR_MULTIPLIER"]
-        tp_dist = sl_dist * self.config["MIN_RISK_REWARD_RATIO"] * (1.0 + self.config["TP_BUFFER_PCT"])
-        
-        if direction == "LONG":
-            return entry_price - sl_dist, entry_price + tp_dist
-        else:
-            return entry_price + sl_dist, entry_price - tp_dist
 
     def _check_risk_reward(self, entry: float, sl: float, tp: float, direction: str) -> bool:
         try:

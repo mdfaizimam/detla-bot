@@ -1,12 +1,13 @@
-# --- utils/api_client.py ---
-# FIX: Correctly builds the unencoded query string for the REST signature
-# (e.g., "?states=open,pending")
+# --- detla-bot/utils/api_client.py ---
+# FIX: Kills bot on "IP not whitelisted" error
+# FIX: Correctly builds the unencoded query string for signature
 
 import asyncio
 import json
 import logging
 import aiohttp
 import urllib.parse
+import sys  # ✅ NEW: For hard exit
 from aiohttp import client_exceptions
 from typing import Optional, Dict, Any, Tuple
 
@@ -99,7 +100,13 @@ class DeltaAPIClient:
                         return status, response_json
                     
                     if status == 401:
-                         logger.warning(
+                        # ✅ NEW: Hard Kill Switch for IP Issues
+                        error_code = response_json.get("error", {}).get("code")
+                        if error_code == "ip_not_whitelisted_for_api_key":
+                            logger.critical("🚨 FATAL ERROR: IP Address is NOT whitelisted. Stopping bot immediately to prevent ban/spam.")
+                            sys.exit(1)
+
+                        logger.warning(
                             f"Server expected signature data: {response_json.get('error', {}).get('context', {}).get('signature_data')}"
                         )
                     

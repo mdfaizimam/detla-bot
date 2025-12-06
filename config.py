@@ -1,7 +1,7 @@
 # --- detla-bot/config.py ---
 # COMPLETE PRODUCTION CONFIGURATION
-# ✅ Includes: Risk, Strategy, Filters, TSL, and System Settings
-# ✅ NEW: Volume Bars, Mean Reversion, Dynamic Confidence
+# 🔧 FIX: Symbol-Specific Sizing for Small Accounts ($76)
+# 🔧 FIX: Disables Smart Sizing to ensure INTEGER quantities
 
 import os
 from pathlib import Path
@@ -47,11 +47,31 @@ PRIORITY_LIST = ["SOLUSD", "ETHUSD", "BTCUSD"]
 # ----------------------------------------------------------------------
 # ✅ Risk Management Parameters
 # ----------------------------------------------------------------------
-BASE_POSITION_SIZE = 1       
+# 🔧 FIX: Per-Symbol Sizing. 
+# Delta requires INTEGERS (1, 2, 10) for these contracts.
+# 1 Contract ≈ $1 USD Value (usually).
+BASE_POSITION_SIZE = {
+    "BTCUSD": 1,  # 1 Contract (~$1-$10 value, safe for $76)
+    "ETHUSD": 1,  # 1 Contract
+    "SOLUSD": 1   # 1 Contract
+}
+
 MAX_DRAWDOWN_PERCENT = 0.15  
 MAX_DAILY_LOSS_PERCENT = 0.05 
-MAX_CONCURRENT_TRADES = 1    
+MAX_CONCURRENT_TRADES = 3    
 MAX_POSITION_SIZE = 0.1      
+
+# 🛑 GATEKEEPER SETTINGS
+GATEKEEPER_ENABLED = True
+GATEKEEPER_VOL_THRESHOLD = 0.25  
+GATEKEEPER_VOLATILITY_MIN = 0.0005 
+
+# 🧠 Position Sizing (FIXED - Disabled Smart Sizing)
+ENABLE_SMART_SIZING = False     
+MIN_SIZE_MULTIPLIER = 1.0      
+MAX_SIZE_MULTIPLIER = 1.0      
+CONFIDENCE_FLOOR = 0.65
+CONFIDENCE_CEILING = 0.90
 
 # ----------------------------------------------------------------------
 # ✅ Smart TP/SL & R/R Parameters 
@@ -79,15 +99,15 @@ TSL_ATR_MULTIPLIER = 1.0
 TSL_MIN_TRAIL_AMOUNT = 0.5   
 
 # ----------------------------------------------------------------------
-# ✅ Dynamic Confidence Strategy (The "Recall" Fix)
+# ✅ Dynamic Confidence Strategy
 # ----------------------------------------------------------------------
 DYNAMIC_CONFIDENCE_ENABLED = True
-BASE_CONFIDENCE = 0.90         # Target confidence for calm markets
-MIN_CONFIDENCE = 0.65          # Floor confidence for exploding markets
-VOLATILITY_SCALER = 2.0        # How aggressively to lower confidence
+BASE_CONFIDENCE = 0.75        
+MIN_CONFIDENCE = 0.65          
+VOLATILITY_SCALER = 2.0        
 
 # ----------------------------------------------------------------------
-# ✅ Mean Reversion Strategy (The "Chop" Fix)
+# ✅ Mean Reversion Strategy
 # ----------------------------------------------------------------------
 MEAN_REVERSION_ENABLED = True
 MR_BB_LENGTH = 20              
@@ -101,9 +121,9 @@ MR_RISK_REWARD = 1.2
 # ✅ Data Granularity (Volume Bars)
 # ----------------------------------------------------------------------
 VOLUME_BAR_SIZE = {
-    "BTCUSD": 5.0,    # Generate bar every 5 BTC traded
-    "ETHUSD": 50.0,   # Generate bar every 50 ETH traded
-    "SOLUSD": 500.0   # Generate bar every 500 SOL traded
+    "BTCUSD": 5.0,    
+    "ETHUSD": 50.0,   
+    "SOLUSD": 500.0   
 }
 VOLUME_BAR_CHANNEL = "delta:volume_bars"
 
@@ -112,10 +132,10 @@ VOLUME_BAR_CHANNEL = "delta:volume_bars"
 # ----------------------------------------------------------------------
 OBI_THRESHOLD = 0.3  
 TFI_THRESHOLD = 0.1  
-SIGNAL_CONFIDENCE = BASE_CONFIDENCE # Default fallback
+SIGNAL_CONFIDENCE = BASE_CONFIDENCE 
 
 # ----------------------------------------------------------------------
-# ✅ Strategy Filters (All 4 Filters)
+# ✅ Strategy Filters
 # ----------------------------------------------------------------------
 TREND_CHECK_ENABLED = True
 TREND_TIMEFRAME = "1h" 
@@ -161,7 +181,7 @@ ERROR_CHANNEL = "delta:errors"
 MONITORING_CHANNEL = "delta:monitoring"
 CONTROL_CHANNEL = "delta:control" 
 TSL_CHANNEL = "delta:tsl_control" 
-REDIS_POSITION_LOCK_KEY = "active_position"
+REDIS_POSITION_LOCK_PREFIX = "active_position:" 
 LATEST_ENRICHED_KEY = "latest:enriched:" 
 HEALTH_CHECK_KEY_FE = "health:fe:last_ts"
 REDIS_DATA_TTL = 3600
@@ -178,21 +198,17 @@ AUDIT_LOG_FILE = LOG_PATH / "audit.log"
 os.makedirs(LOG_PATH, exist_ok=True)
 
 # ----------------------------------------------------------------------
-# ✅ Derived Config Object
+# ✅ Config Dictionary
 # ----------------------------------------------------------------------
 config = {
-    "BASE_POSITION_SIZE": BASE_POSITION_SIZE,
+    "BASE_POSITION_SIZE": BASE_POSITION_SIZE, 
     "MIN_RISK_REWARD_RATIO": MIN_RISK_REWARD_RATIO,
     "ATR_TIMEFRAME": ATR_TIMEFRAME,
     "SL_ATR_MULTIPLIER": SL_ATR_MULTIPLIER,
     "TP_BUFFER_PCT": TP_BUFFER_PCT,
-    
-    # Training Params
     "ATR_LABEL_MULTIPLIER": ATR_LABEL_MULTIPLIER,
     "LAG_PERIODS": LAG_PERIODS,
     "USE_STACKING_ENSEMBLE": USE_STACKING_ENSEMBLE,
-    
-    # Dynamic & MR Params
     "DYNAMIC_CONFIDENCE_ENABLED": DYNAMIC_CONFIDENCE_ENABLED,
     "BASE_CONFIDENCE": BASE_CONFIDENCE,
     "MIN_CONFIDENCE": MIN_CONFIDENCE,
@@ -203,20 +219,18 @@ config = {
     "MR_KER_THRESHOLD": MR_KER_THRESHOLD,
     "MR_RISK_REWARD": MR_RISK_REWARD,
     "VOLUME_BAR_SIZE": VOLUME_BAR_SIZE,
-
-    # TSL (Dynamic & Static)
+    "ENABLE_SMART_SIZING": ENABLE_SMART_SIZING,
+    "GATEKEEPER_ENABLED": GATEKEEPER_ENABLED,
+    "GATEKEEPER_VOL_THRESHOLD": GATEKEEPER_VOL_THRESHOLD,
+    "GATEKEEPER_VOLATILITY_MIN": GATEKEEPER_VOLATILITY_MIN,
     "TSL_ENABLED": TSL_ENABLED,
     "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT, 
     "TSL_CHECK_INTERVAL": TSL_CHECK_INTERVAL,
     "TSL_CHANNEL": TSL_CHANNEL,
     "TSL_ATR_MULTIPLIER": TSL_ATR_MULTIPLIER, 
     "TSL_MIN_TRAIL_AMOUNT": TSL_MIN_TRAIL_AMOUNT, 
-
-    # Heuristic Params
     "OBI_THRESHOLD": OBI_THRESHOLD,
     "TFI_THRESHOLD": TFI_THRESHOLD,
-    
-    # Filter Params
     "TREND_CHECK_ENABLED": TREND_CHECK_ENABLED,
     "TREND_TIMEFRAME": TREND_TIMEFRAME,
     "FUNDING_CHECK_ENABLED": FUNDING_CHECK_ENABLED,
@@ -227,31 +241,13 @@ config = {
     "VOLUME_SURGE_MULTIPLIER": VOLUME_SURGE_MULTIPLIER,
     "SNR_CHECK_ENABLED": SNR_CHECK_ENABLED,
     "SNR_PROXIMITY_PCT": SNR_PROXIMITY_PCT,
-
-    # Execution Params
     "BRACKET_STOP_TRIGGER": BRACKET_STOP_TRIGGER,
     "USER_AGENT": USER_AGENT,
     "LOG_LEVEL": LOG_LEVEL, 
-    
-    # API Client Config
     "API_MAX_RETRIES": API_MAX_RETRIES,
     "API_RETRY_DELAY": API_RETRY_DELAY,
+    "CONFIDENCE_FLOOR": CONFIDENCE_FLOOR,
+    "CONFIDENCE_CEILING": CONFIDENCE_CEILING,
+    "MIN_SIZE_MULTIPLIER": MIN_SIZE_MULTIPLIER,
+    "MAX_SIZE_MULTIPLIER": MAX_SIZE_MULTIPLIER
 }
-
-# ----------------------------------------------------------------------
-# ✅ Startup Prints
-# ----------------------------------------------------------------------
-print(f"✅ Configuration loaded successfully")
-print(f"📊 Trading Symbols: {TRADING_SYMBOLS}")
-print(f"🎯 Priority List: {' -> '.join(PRIORITY_LIST)}")
-print(f"🛡️ Risk Management: {MAX_DRAWDOWN_PERCENT*100}% max drawdown, {MAX_DAILY_LOSS_PERCENT*100}% daily loss")
-print(f"🤖 Strategy: Hybrid (ML Trend + Mean Reversion)")
-print(f"--- FILTERS ---")
-print(f"📈 Trend: {TREND_CHECK_ENABLED} on {TREND_TIMEFRAME} candle")
-print(f"💵 Funding: {FUNDING_CHECK_ENABLED} (Threshold: {FUNDING_RATE_THRESHOLD * 100}%)")
-print(f"🌊 Volume: {VOLUME_CHECK_ENABLED} ({VOLUME_TIMEFRAME} vol > {VOLUME_SURGE_MULTIPLIER}x SMA({VOLUME_SMA_PERIOD}))")
-print(f"⛰️ S/R: {SNR_CHECK_ENABLED} (Avoid {SNR_PROXIMITY_PCT * 100}% proximity to Daily/Weekly/Monthly levels)")
-print(f"⚖️ R/R: Required Ratio > {MIN_RISK_REWARD_RATIO}:1")
-print(f"🎛️ Single Position Mode: Active (Max {MAX_CONCURRENT_TRADES} concurrent trade)")
-print(f"𔀀 Trailing Stop Loss: {'Enabled' if TSL_ENABLED else 'Disabled'} (Trail: {TSL_ATR_MULTIPLIER}x ATR, Min: {TSL_MIN_TRAIL_AMOUNT} USD)")
-print(f"🧠 Dynamic Confidence: Enabled (Base: {BASE_CONFIDENCE}, Min: {MIN_CONFIDENCE})")
