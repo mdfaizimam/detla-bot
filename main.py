@@ -1,6 +1,5 @@
 # --- detla-bot/main.py ---
-# ✅ FIXED: Windows-compatible Shutdown
-# ✅ FIXED: Redis Keepalive
+# ✅ FIX: Updated initialization to inject api_client into RiskManager
 
 import asyncio
 import signal
@@ -125,7 +124,8 @@ async def run_bot():
         ws_manager = WebSocketManager(redis_client, http_session)
         feature_engine = FeatureEngine(redis_client, http_session) 
         
-        risk_manager = RiskManager(redis_client)
+        # ✅ FIX: RiskManager needs api_client to sync equity
+        risk_manager = RiskManager(redis_client, api_client)
         await risk_manager._load_state_from_redis() 
         await risk_manager.start() 
 
@@ -177,7 +177,6 @@ async def run_bot():
         logger.info("✅ All services stopped cleanly.")
 
 if __name__ == "__main__":
-    # ✅ FIX: Windows-compatible shutdown logic
     try:
         if sys.platform == 'win32':
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
