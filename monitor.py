@@ -1,6 +1,7 @@
 # --- detla-bot/monitor.py ---
+# ✅ FIXED: Explicitly kills TSL when position closes
+# ✅ ROBUST: Cleans up Redis locks and state
 # ✅ FIXED: "PnL Erasure" Bug - Calls risk_manager.sync_equity() on position close
-# ✅ ROBUST: Uses exchange wallet balance instead of guessing PnL
 
 import asyncio
 import json
@@ -10,7 +11,8 @@ from utils.api_client import DeltaAPIClient
 from config import (
     MONITORING_CHANNEL, 
     PRIVATE_CHANNEL, 
-    REDIS_POSITION_LOCK_PREFIX
+    REDIS_POSITION_LOCK_PREFIX,
+    TSL_CHANNEL
 )
 from risk_manager import RiskManager
 
@@ -74,42 +76,56 @@ class PositionMonitor:
             
             # If we see a trade for an active symbol, check if it closed the position
             if symbol in self.active_symbols:
+                # Use create_task to avoid blocking the listener
                 asyncio.create_task(self._verify_flat_status(symbol))
 
     async def _verify_flat_status(self, symbol: str):
         """
         Queries the API to check if the position is closed.
-        If closed, syncs equity and releases lock.
+        If closed, syncs equity, releases lock, and KILLS TSL.
         """
         await asyncio.sleep(1.5) # Wait for backend settlement
         
-        # GET /positions returns open positions
-        status, response = await self.api_client.get("/v2/positions", params={"underlying_asset_symbol": symbol})
-        
-        if status == 200:
-            positions = response.get("result", [])
+        try:
+            # GET /positions returns open positions
+            # Note: Delta API often filters out closed positions entirely from this list
+            status, response = await self.api_client.get("/v2/positions", params={"underlying_asset_symbol": symbol})
             
-            # Check if our symbol is present with non-zero size
-            # If position is CLOSED, it is often removed from the list entirely
-            is_open = False
-            current_size = 0.0
-            
-            for p in positions:
-                p_sym = p.get("product_symbol") or p.get("symbol")
-                if p_sym == symbol:
-                    current_size = float(p.get("size", 0))
-                    if current_size != 0:
-                        is_open = True
-            
-            if not is_open or current_size == 0:
-                logger.info(f"✅ Position closed for {symbol}. Syncing Equity & Releasing lock.")
+            if status == 200:
+                positions = response.get("result", [])
                 
-                # ✅ FIX: Sync Equity directly from API to capture exact PnL
-                await self.risk_manager.sync_equity()
+                is_open = False
+                current_size = 0.0
                 
-                await self._release_lock(symbol)
+                for p in positions:
+                    p_sym = p.get("product_symbol") or p.get("symbol")
+                    if p_sym == symbol:
+                        current_size = float(p.get("size", 0))
+                        if current_size != 0:
+                            is_open = True
+                            break # Found open position
+                
+                if not is_open or current_size == 0:
+                    logger.info(f"✅ Position closed for {symbol}. Syncing Equity & Releasing lock.")
+                    
+                    # 1. Update Risk Manager (Capture PnL)
+                    await self.risk_manager.sync_equity()
+                    
+                    # 2. Release Lock
+                    await self._release_lock(symbol)
+
+                    # 3. CRITICAL: Kill TSL Manager for this symbol
+                    stop_payload = {"command": "STOP_TSL", "symbol": symbol}
+                    await self.redis.publish(TSL_CHANNEL, json.dumps(stop_payload))
+                    logger.info(f"☠️ Sent STOP_TSL command for {symbol}")
+
+                else:
+                    logger.debug(f"Position still open for {symbol}: Size {current_size}")
             else:
-                logger.debug(f"Position still open for {symbol}: Size {current_size}")
+                 logger.warning(f"Failed to verify position status for {symbol}: HTTP {status}")
+                 
+        except Exception as e:
+            logger.error(f"Error checking position status for {symbol}: {e}")
 
     async def _release_lock(self, symbol: str):
         if symbol in self.active_symbols:

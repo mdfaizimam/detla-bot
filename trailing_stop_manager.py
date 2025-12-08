@@ -1,7 +1,9 @@
 # --- detla-bot/trailing_stop_manager.py ---
-# FIXED: Parameter bug (product_ids -> product_id)
-# FIXED: Crash on invalid response types (Type Safety)
-# ✅ FIX: Handles Dict response from /v2/positions
+# ✅ FIX: Explicitly handles "Order Already Triggered" error (Stops Zombie Loop)
+# ✅ FIX: Implements TSL Activation Buffer (Prevents immediate stop out)
+# ✅ FIX: Added "Heartbeat" log to show monitoring status even when not updating
+# ✅ NEW: Added DYNAMIC TSL LOGIC (Tightens stop as profit increases)
+# ✅ FIX: Ghost Order Crash (Handles 'open_order_not_found' gracefully)
 
 import asyncio
 import aiohttp
@@ -44,6 +46,7 @@ class TrailingStopManager:
             "min_trail_amount": config["TSL_MIN_TRAIL_AMOUNT"],
             "check_interval": config["TSL_CHECK_INTERVAL"],
             "atr_timeframe": ATR_TIMEFRAME,
+            "activation_pct": config.get("TSL_ACTIVATION_PCT", 0.005) # ✅ Default 0.5%
         }
 
         self._runner_task: Optional[asyncio.Task] = None
@@ -62,9 +65,12 @@ class TrailingStopManager:
                     data = json.loads(msg["data"])
                 except Exception:
                     continue
-
+                
+                # ✅ NEW: Handle explicit STOP command from Monitor
                 if channel == TSL_CHANNEL:
-                    if data.get("command") == "START_TSL":
+                    command = data.get("command")
+                    
+                    if command == "START_TSL":
                         product_id = int(data["product_id"])
                         symbol = data["symbol"]
                         
@@ -95,6 +101,23 @@ class TrailingStopManager:
                             "active": True,
                             "last_validated": asyncio.get_event_loop().time()
                         }
+                    
+                    elif command == "STOP_TSL":
+                        # Monitor tells us to kill TSL because position is closed
+                        symbol = data.get("symbol")
+                        product_id = None
+                        # Find product_id by symbol
+                        for pid, info in self.active_positions.items():
+                            if info["symbol"] == symbol:
+                                product_id = pid
+                                break
+                        
+                        if product_id:
+                            logger.info(f"🛑 Received STOP_TSL command for {symbol}. Killing loop.")
+                            if product_id in self.active_positions:
+                                self.active_positions[product_id]["active"] = False
+                            if product_id in self.tsl_tasks and not self.tsl_tasks[product_id].done():
+                                self.tsl_tasks[product_id].cancel()
 
                 elif channel == MONITORING_CHANNEL:
                     event_type = data.get("type")
@@ -159,7 +182,6 @@ class TrailingStopManager:
             return True
         
         try:
-            # ✅ FIX: Use 'product_id' (singular), not 'product_ids'
             path = "/v2/positions"
             params = {"product_id": str(product_id)}
             
@@ -168,7 +190,6 @@ class TrailingStopManager:
             if status == 200 and data and isinstance(data, dict) and data.get("success"):
                 result = data.get("result")
                 
-                # ✅ FIX: Handle Dict Response (Single Object)
                 if isinstance(result, dict):
                      size = float(result.get("size", 0))
                      direction = self.active_positions[product_id]["direction"]
@@ -176,7 +197,6 @@ class TrailingStopManager:
                         self.active_positions[product_id]["last_validated"] = current_time
                         return True
                 
-                # ✅ FIX: Handle List Response
                 elif isinstance(result, list):
                     for position in result:
                         if not isinstance(position, dict): continue
@@ -191,7 +211,6 @@ class TrailingStopManager:
                 self.active_positions[product_id]["active"] = False
                 return False
             
-            # Fallback Strategy - Validate by Symbol if ID check failed
             elif status == 400:
                 symbol = self.active_positions[product_id].get("symbol")
                 if symbol and isinstance(symbol, str):
@@ -215,7 +234,6 @@ class TrailingStopManager:
                         self.active_positions[product_id]["active"] = False
                         return False
             
-            # General Error Fallback: Assume active
             logger.warning("⚠️ Failed to validate position for product_id=%s (HTTP %s). Assuming active.", product_id, status)
             return True
                 
@@ -226,7 +244,6 @@ class TrailingStopManager:
         return True
 
     async def _get_latest_atr(self, symbol: str) -> Optional[float]:
-        """Fetch the latest ATR value from FeatureEngine's cache."""
         try:
             enriched_json = await self.redis.get(f"{LATEST_ENRICHED_KEY}{symbol}")
             if not enriched_json:
@@ -243,7 +260,6 @@ class TrailingStopManager:
             return None
 
     async def fetch_ticker_data(self, symbol: str) -> Tuple[Optional[float], Optional[float]]:
-        """Fetch live mark & last traded price."""
         path = f"/v2/tickers/{symbol}"
         url = f"{DELTA_BASE_URL}{path}"
         headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
@@ -263,7 +279,6 @@ class TrailingStopManager:
             return (None, None)
 
     async def fetch_open_stop_order_id(self, product_id: int, increment_attempt: bool = True) -> Optional[Tuple[int, str]]:
-        """Return (order_id, order_type) for the active stop-loss child order."""
         if increment_attempt:
             if product_id in self.sl_search_attempts:
                 self.sl_search_attempts[product_id] += 1
@@ -275,7 +290,6 @@ class TrailingStopManager:
                 return None
         
         path = "/v2/orders"
-        # Orders endpoint uses plural 'product_ids'
         params = {
             "product_ids": str(product_id), 
             "stop_order_type": "stop_loss_order",
@@ -306,7 +320,7 @@ class TrailingStopManager:
         new_stop_price: float,
         order_type: str = "market_order",
     ) -> bool:
-        """Edit the stop order preserving its original order_type."""
+        # Check active status periodically
         update_count = self.active_positions.get(product_id, {}).get("update_count", 0)
         if update_count % 5 == 0:
             if not await self.validate_position_active(product_id):
@@ -338,12 +352,22 @@ class TrailingStopManager:
             logger.info("✅ Stop order %s updated to %s", order_id, req["stop_price"])
             return True
         
+        # ✅ FIX: Handle Ghost Order Errors Gracefully
         if status == 400:
             error_code = resp.get("error", {}).get("code") if resp else "unknown"
-            if error_code == "open_order_not_found":
-                logger.warning("⚠️ Stop-loss order %s not found. Position may be closed.", order_id)
+            
+            if error_code == "stop_price_change_not_supported":
+                logger.error(f"🛑 Order {order_id} triggered/closed. Stopping TSL.")
                 if product_id in self.active_positions:
                     self.active_positions[product_id]["active"] = False
+                return False
+
+            if error_code == "open_order_not_found":
+                logger.warning("⚠️ Ghost Order detected: Stop-loss %s not found. Assuming position closed.", order_id)
+                if product_id in self.active_positions:
+                    self.active_positions[product_id]["active"] = False
+                return False
+                
             else:
                 logger.error("❌ Failed to update stop order (HTTP 400, code=%s): %s", error_code, resp)
         else:
@@ -359,18 +383,20 @@ class TrailingStopManager:
         size: int | float,
         entry_price: float
     ):
-        """Continuous trailing stop logic."""
-        trail_multiplier = float(self.tsl_config["trail_multiplier"])
+        base_multiplier = float(self.tsl_config["trail_multiplier"])
         min_trail_amount = float(self.tsl_config["min_trail_amount"])
+        activation_pct = float(self.tsl_config["activation_pct"]) 
         check_interval = float(self.tsl_config["check_interval"])
 
         best_price_seen: float = float(entry_price)
         sl_tuple: Optional[Tuple[int, str]] = None
         consecutive_order_errors = 0
         max_consecutive_errors = 3
+        
+        loop_counter = 0
 
-        logger.info("TSL Loop for %s started @ entry=%.4f (trail x%.2f floor=%.4f)",
-                    symbol, best_price_seen, trail_multiplier, min_trail_amount)
+        logger.info("TSL Loop for %s started @ entry=%.4f (base trail x%.2f activation=%.2f%%)",
+                    symbol, best_price_seen, base_multiplier, activation_pct*100)
 
         for attempt in range(3):
             sl_tuple = await self.fetch_open_stop_order_id(product_id, increment_attempt=(attempt == 0))
@@ -398,6 +424,8 @@ class TrailingStopManager:
 
         while True:
             try:
+                loop_counter += 1
+                
                 if product_id not in self.active_positions or not self.active_positions[product_id].get("active", True):
                     logger.info("🛑 Position marked as inactive for %s. Stopping TSL.", symbol)
                     break
@@ -409,36 +437,72 @@ class TrailingStopManager:
                     await asyncio.sleep(check_interval)
                     continue
 
+                profit_pct = 0.0
+                if direction == "LONG":
+                    profit_pct = (live_price - entry_price) / entry_price
+                else:
+                    profit_pct = (entry_price - live_price) / entry_price
+
+                current_multiplier = base_multiplier
+                mode = "BASE"
+                
+                if profit_pct > 0.03: 
+                    current_multiplier = 1.0 
+                    mode = "TIGHT (3% gain)"
+                elif profit_pct > 0.015: 
+                    current_multiplier = 1.5
+                    mode = "MEDIUM (1.5% gain)"
+                
+                if loop_counter % 12 == 0:
+                    status_msg = "WAITING" if profit_pct < activation_pct else f"ACTIVE ({mode})"
+                    logger.info(
+                        f"💓 TSL Monitor [{symbol}]: PnL={profit_pct*100:.2f}% | "
+                        f"Mult={current_multiplier} | Status={status_msg} | "
+                        f"Price={live_price:.2f} | Best={best_price_seen:.2f}"
+                    )
+
+                if profit_pct < activation_pct:
+                    await asyncio.sleep(check_interval)
+                    continue
+
                 latest_atr = await self._get_latest_atr(symbol)
                 if latest_atr is not None and latest_atr > 0:
-                    trail_amt = max(latest_atr * trail_multiplier, min_trail_amount)
+                    trail_amt = max(latest_atr * current_multiplier, min_trail_amount)
                 else:
                     trail_amt = min_trail_amount
+
+                should_update = False
+                new_stop = 0.0
 
                 if direction == "LONG":
                     if live_price > best_price_seen:
                         best_price_seen = live_price
-                    new_stop = best_price_seen - trail_amt
+                        new_stop = best_price_seen - trail_amt
+                        should_update = True 
                 else:
                     if live_price < best_price_seen:
                         best_price_seen = live_price
-                    new_stop = best_price_seen + trail_amt
+                        new_stop = best_price_seen + trail_amt
+                        should_update = True
 
-                success = await self.update_stop_price(
-                    order_id=stop_order_id,
-                    product_id=product_id,
-                    size=size,
-                    new_stop_price=new_stop,
-                    order_type=stop_order_type,
-                )
-                
-                if success:
-                    consecutive_order_errors = 0
-                else:
-                    consecutive_order_errors += 1
-                    if consecutive_order_errors >= max_consecutive_errors:
-                        logger.error("❌ Max consecutive errors reached for %s. Stopping TSL.", symbol)
-                        break
+                if should_update:
+                    success = await self.update_stop_price(
+                        order_id=stop_order_id,
+                        product_id=product_id,
+                        size=size,
+                        new_stop_price=new_stop,
+                        order_type=stop_order_type,
+                    )
+                    
+                    if success:
+                        consecutive_order_errors = 0
+                    else:
+                        if product_id in self.active_positions and not self.active_positions[product_id].get("active", True):
+                             break
+                        consecutive_order_errors += 1
+                        if consecutive_order_errors >= max_consecutive_errors:
+                            logger.error("❌ Max consecutive errors reached for %s. Stopping TSL.", symbol)
+                            break
 
                 await asyncio.sleep(check_interval)
 
@@ -457,7 +521,6 @@ class TrailingStopManager:
         logger.info("✅ TSL stopped for %s", symbol)
 
     async def _cleanup_product(self, product_id: int):
-        """Clean up all tracking for a product."""
         if product_id in self.tsl_tasks:
             del self.tsl_tasks[product_id]
         if product_id in self.sl_search_attempts:
@@ -468,7 +531,6 @@ class TrailingStopManager:
             del self.product_to_symbol[product_id]
 
     async def close(self):
-        """Clean shutdown."""
         for pid in list(self.tsl_tasks.keys()):
             if pid in self.tsl_tasks and not self.tsl_tasks[pid].done():
                 self.tsl_tasks[pid].cancel()

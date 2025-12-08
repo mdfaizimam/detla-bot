@@ -2,6 +2,7 @@
 # ✅ FIX: Removed unused 'self.session' to fix AttributeError in tests
 # ✅ FIX: Retry logic for fetching fill price (Avoids $0.00 fills)
 # ✅ FIX: Robust error handling
+# ✅ FIX: Increased Lock TTL to 300s to match Reconciler
 
 import asyncio
 import json
@@ -20,7 +21,8 @@ from risk_manager import RiskManager
 logger = logging.getLogger("executor")
 
 class OrderExecutionManager:
-    REDIS_POSITION_LOCK_TTL = 60
+    # 🔧 CHANGED: Increased from 60 to 300 to match Reconciler cycle & prevent double entries
+    REDIS_POSITION_LOCK_TTL = 300
 
     def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
         self.redis = redis_client
