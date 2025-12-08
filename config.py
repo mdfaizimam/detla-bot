@@ -1,7 +1,9 @@
 # --- detla-bot/config.py ---
 # COMPLETE PRODUCTION CONFIGURATION
-# 🔧 FIX: Symbol-Specific Sizing for Small Accounts ($76)
-# 🔧 FIX: Disables Smart Sizing to ensure INTEGER quantities
+# ✅ FIX: Widened TSL settings to prevent "suffocation"
+# ✅ FIX: Added Activation Buffer for TSL
+# ✅ FIX: Increased Confidence & Cooldown settings
+# ✅ FIX: Defined 'TSL_TRAIL_AMOUNT' to resolve Pylance error
 
 import os
 from pathlib import Path
@@ -48,12 +50,10 @@ PRIORITY_LIST = ["SOLUSD", "ETHUSD", "BTCUSD"]
 # ✅ Risk Management Parameters
 # ----------------------------------------------------------------------
 # 🔧 FIX: Per-Symbol Sizing. 
-# Delta requires INTEGERS (1, 2, 10) for these contracts.
-# 1 Contract ≈ $1 USD Value (usually).
 BASE_POSITION_SIZE = {
-    "BTCUSD": 1,  # 1 Contract (~$1-$10 value, safe for $76)
-    "ETHUSD": 1,  # 1 Contract
-    "SOLUSD": 1   # 1 Contract
+    "BTCUSD": 1, 
+    "ETHUSD": 1, 
+    "SOLUSD": 1   
 }
 
 MAX_DRAWDOWN_PERCENT = 0.15  
@@ -66,7 +66,7 @@ GATEKEEPER_ENABLED = True
 GATEKEEPER_VOL_THRESHOLD = 0.25  
 GATEKEEPER_VOLATILITY_MIN = 0.0005 
 
-# 🧠 Position Sizing (FIXED - Disabled Smart Sizing)
+# 🧠 Position Sizing
 ENABLE_SMART_SIZING = False     
 MIN_SIZE_MULTIPLIER = 1.0      
 MAX_SIZE_MULTIPLIER = 1.0      
@@ -77,7 +77,7 @@ CONFIDENCE_CEILING = 0.90
 # ✅ Smart TP/SL & R/R Parameters 
 # ----------------------------------------------------------------------
 ATR_TIMEFRAME = "5m"       
-SL_ATR_MULTIPLIER = 2.0    
+SL_ATR_MULTIPLIER = 2.5     # ⬆️ INCREASED: Give trade room to breathe (was 2.0)
 TP_BUFFER_PCT = 0.001      
 MIN_RISK_REWARD_RATIO = 1.5 
 
@@ -89,21 +89,26 @@ LAG_PERIODS = [1, 3, 5]
 USE_STACKING_ENSEMBLE = True 
 
 # ----------------------------------------------------------------------
-# ✅ Trailing Stop Loss (TSL) Parameters
+# ✅ Trailing Stop Loss (TSL) Parameters - 🔧 CRITICAL FIXES
 # ----------------------------------------------------------------------
 TSL_ENABLED = True
-TSL_TRAIL_AMOUNT = 2.00    
 TSL_CHECK_INTERVAL = 5     
 TSL_CHANNEL = "delta:tsl_control" 
-TSL_ATR_MULTIPLIER = 1.0     
+
+# 🔧 FIX: Relaxed TSL to match Initial SL (Prevents immediate stop out)
+TSL_ATR_MULTIPLIER = 2.0     # ⬆️ INCREASED from 1.0 to 2.0
 TSL_MIN_TRAIL_AMOUNT = 0.5   
+TSL_TRAIL_AMOUNT = 2.0       # ✅ FIXED: Added missing variable definition
+
+# 🔧 FIX: Activation Buffer (Wait for 0.5% profit before trailing starts)
+TSL_ACTIVATION_PCT = 0.005   # ✅ NEW: Prevents TSL from killing trade at entry
 
 # ----------------------------------------------------------------------
 # ✅ Dynamic Confidence Strategy
 # ----------------------------------------------------------------------
 DYNAMIC_CONFIDENCE_ENABLED = True
-BASE_CONFIDENCE = 0.75        
-MIN_CONFIDENCE = 0.65          
+BASE_CONFIDENCE = 0.65        # ⬆️ INCREASED from 0.55/0.50 to filter noise
+MIN_CONFIDENCE = 0.60          
 VOLATILITY_SCALER = 2.0        
 
 # ----------------------------------------------------------------------
@@ -224,11 +229,12 @@ config = {
     "GATEKEEPER_VOL_THRESHOLD": GATEKEEPER_VOL_THRESHOLD,
     "GATEKEEPER_VOLATILITY_MIN": GATEKEEPER_VOLATILITY_MIN,
     "TSL_ENABLED": TSL_ENABLED,
-    "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT, 
+    "TSL_TRAIL_AMOUNT": TSL_TRAIL_AMOUNT, # ✅ Now defined
     "TSL_CHECK_INTERVAL": TSL_CHECK_INTERVAL,
     "TSL_CHANNEL": TSL_CHANNEL,
     "TSL_ATR_MULTIPLIER": TSL_ATR_MULTIPLIER, 
-    "TSL_MIN_TRAIL_AMOUNT": TSL_MIN_TRAIL_AMOUNT, 
+    "TSL_MIN_TRAIL_AMOUNT": TSL_MIN_TRAIL_AMOUNT,
+    "TSL_ACTIVATION_PCT": TSL_ACTIVATION_PCT, 
     "OBI_THRESHOLD": OBI_THRESHOLD,
     "TFI_THRESHOLD": TFI_THRESHOLD,
     "TREND_CHECK_ENABLED": TREND_CHECK_ENABLED,

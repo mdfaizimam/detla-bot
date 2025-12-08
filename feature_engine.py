@@ -3,6 +3,7 @@
 # ✅ PERFORMANCE: Removed Pandas/Pandas-TA for 100x speedup
 # ✅ INFRASTRUCTURE: Uses orjson for blazing fast serialization
 # ✅ LOGIC: Maintains rolling numpy buffers for O(1) updates
+# ✅ ADDED: True ADX (Regime Filter), Micro-Price, Volatility Normalization
 
 import asyncio
 import logging
@@ -36,7 +37,7 @@ log = logging.getLogger("feature_engine")
 
 # --- Constants ---
 TFI_LOOKBACK_SECONDS = 5
-CANDLE_HISTORY_SIZE = 200 # Increased slightly for reliable EMA/ADX calc
+CANDLE_HISTORY_SIZE = 300 # Increased for reliable ADX/EMA calc (Wilder smoothing needs history)
 CANDLE_RESOLUTIONS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 
 RESOLUTION_SECONDS = {
@@ -100,7 +101,8 @@ class FeatureEngine:
 
         if symbol not in self.features:
             self.features[symbol] = {
-                "obi": 0.0, "mid_price": None, "tfi": 0.0,
+                "obi": 0.0, "mid_price": None, "micro_price": None, # Added Micro-Price
+                "tfi": 0.0,
                 "tfi_state": {"buy_vol": 0.0, "sell_vol": 0.0},
                 "last_trade_price": None, "mark_price": None,
                 "funding_rate": None, "spot_price": None, 
@@ -371,22 +373,37 @@ class FeatureEngine:
 
     def _calc_imbalance_and_mid(self, symbol: str):
         book = self.order_books.get(symbol)
-        if not book or not book["bids"] or not book["asks"]: return 0.0, None 
+        if not book or not book["bids"] or not book["asks"]: return 0.0, None, None
         try:
             bid_price_keys = sorted(book["bids"].keys(), key=float, reverse=True)
             ask_price_keys = sorted(book["asks"].keys(), key=float)
-            if not bid_price_keys or not ask_price_keys: return 0.0, None
+            
+            if not bid_price_keys or not ask_price_keys: return 0.0, None, None
+            
+            # --- Standard Imbalance ---
             top_n_bid_keys = bid_price_keys[:self.top_n]
             top_n_ask_keys = ask_price_keys[:self.top_n]
             bid_vol = sum(book["bids"][key] for key in top_n_bid_keys)
             ask_vol = sum(book["asks"][key] for key in top_n_ask_keys)
             denom = bid_vol + ask_vol
             obi = (bid_vol - ask_vol) / denom if denom else 0.0
+            
             top_bid = float(bid_price_keys[0])
             top_ask = float(ask_price_keys[0])
             mid_price = (top_bid + top_ask) / 2.0
-            return obi, mid_price
-        except Exception: return 0.0, None
+            
+            # --- Micro Price (Volume Weighted Mid) ---
+            # Use top level volume for immediate micro-price
+            best_bid_vol = book["bids"][bid_price_keys[0]]
+            best_ask_vol = book["asks"][ask_price_keys[0]]
+            vol_denom = best_bid_vol + best_ask_vol
+            if vol_denom > 0:
+                micro_price = ((top_ask * best_bid_vol) + (top_bid * best_ask_vol)) / vol_denom
+            else:
+                micro_price = mid_price
+
+            return obi, mid_price, micro_price
+        except Exception: return 0.0, None, None
             
     def _calculate_tfi(self, symbol: str):
         if symbol not in self.features: return 0.0
@@ -407,6 +424,7 @@ class FeatureEngine:
 
             try:
                 data = np.array(candle_deque)
+                # Data Structure: [ts, open, high, low, close, volume]
                 close = data[:, 4]
                 high = data[:, 2]
                 low = data[:, 3]
@@ -423,6 +441,7 @@ class FeatureEngine:
                 ema_20 = fast_ema(close, 20)
                 ema_50 = fast_ema(close, 50)
                 
+                # --- FAST RSI ---
                 def fast_rsi(prices, period=14):
                     if len(prices) < period + 1: return 50.0
                     deltas = np.diff(prices)
@@ -440,6 +459,7 @@ class FeatureEngine:
 
                 rsi_14 = fast_rsi(close, 14)
                 
+                # --- MACD ---
                 def get_ema_series(values, period):
                     alpha = 2 / (period + 1)
                     ema = np.zeros_like(values)
@@ -454,14 +474,57 @@ class FeatureEngine:
                 signal_line = get_ema_series(macd_line, 9)
                 macd_hist = macd_line[-1] - signal_line[-1]
                 
+                # --- ATR & ADX (Directional Movement) ---
+                # True Range Calculation
                 if len(close) > 1:
                     prev_close = np.roll(close, 1)
                     prev_close[0] = close[0]
-                    tr = np.maximum(high - low, np.maximum(np.abs(high - prev_close), np.abs(low - prev_close)))
+                    tr1 = high - low
+                    tr2 = np.abs(high - prev_close)
+                    tr3 = np.abs(low - prev_close)
+                    tr = np.maximum(tr1, np.maximum(tr2, tr3))
                     atr = fast_ema(tr, 14)
                 else:
+                    tr = high - low
                     atr = (high[-1] - low[-1])
                 
+                # --- TRUE ADX IMPLEMENTATION (Welles Wilder) ---
+                adx_val = 20.0 # Default fallback
+                if len(close) > 28:
+                    up_move = np.diff(high, prepend=high[0])
+                    down_move = -np.diff(low, prepend=low[0])
+                    
+                    pdm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+                    mdm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+                    
+                    # Wilder's Smoothing Helper
+                    def wilders_smooth(values, period):
+                        # Initial is SMA
+                        smoothed = np.zeros_like(values)
+                        smoothed[period-1] = np.mean(values[:period])
+                        for i in range(period, len(values)):
+                            smoothed[i] = smoothed[i-1] - (smoothed[i-1]/period) + values[i]
+                        return smoothed
+
+                    tr_s = wilders_smooth(tr, 14)
+                    pdm_s = wilders_smooth(pdm, 14)
+                    mdm_s = wilders_smooth(mdm, 14)
+                    
+                    # Avoid division by zero
+                    tr_s = np.where(tr_s == 0, 1e-9, tr_s)
+                    
+                    pdi = 100 * (pdm_s / tr_s)
+                    mdi = 100 * (mdm_s / tr_s)
+                    
+                    dx_denom = pdi + mdi
+                    dx_denom = np.where(dx_denom == 0, 1e-9, dx_denom)
+                    dx = 100 * np.abs(pdi - mdi) / dx_denom
+                    
+                    # Final ADX is smoothed DX
+                    adx_series = wilders_smooth(dx, 14)
+                    adx_val = adx_series[-1]
+
+                # --- Bollinger Bands ---
                 bb_period = 20
                 if len(close) >= bb_period:
                     sma20 = np.mean(close[-bb_period:])
@@ -473,6 +536,7 @@ class FeatureEngine:
                 else:
                     bb_upper, bb_lower, bb_mid, bb_width = 0,0,0,0
 
+                # --- Kaufman Efficiency Ratio ---
                 er_period = 10
                 if len(close) > er_period:
                     change = np.abs(close[-1] - close[-er_period - 1])
@@ -483,7 +547,6 @@ class FeatureEngine:
 
                 obv_change = np.sign(np.diff(close, prepend=close[0])) * volume
                 obv = np.sum(obv_change)
-                adx_proxy = np.abs(ema_20 - e12[-20]) / close[-1] * 1000
                 fractal_dim = atr / (np.std(close[-20:]) + 1e-9)
 
                 latest_tas = {
@@ -494,14 +557,15 @@ class FeatureEngine:
                     "close": close[-1],
                     "open": data[-1, 1],
                     "obv": obv,
-                    "adx": adx_proxy,
+                    "adx": adx_val, # ✅ True ADX
                     "ker": ker,
                     "fractal_dim": fractal_dim,
                     "bb_lower": bb_lower,
                     "bb_upper": bb_upper,
                     "bb_mid": bb_mid,
                     "bb_width": bb_width,
-                    "atr": atr
+                    "atr": atr,
+                    "atr_pct": (atr / close[-1]) * 100 # ✅ Volatility Normalization
                 }
                 
                 if timeframe == VOLUME_TIMEFRAME:
@@ -532,10 +596,13 @@ class FeatureEngine:
 
     async def _publish_features(self, symbol: str, timestamp_us: int):
         if symbol not in self.features: self._initialize_state(symbol)
-        obi, mid_price = self._calc_imbalance_and_mid(symbol)
+        obi, mid_price, micro_price = self._calc_imbalance_and_mid(symbol)
+        
         if mid_price is not None:
             self.features[symbol]["obi"] = obi
             self.features[symbol]["mid_price"] = mid_price
+            self.features[symbol]["micro_price"] = micro_price # ✅ Include Micro-Price
+            
         self.features[symbol]["tfi"] = self._calculate_tfi(symbol)
         self.features[symbol]["timestamp"] = timestamp_us
 
@@ -549,6 +616,7 @@ class FeatureEngine:
                 "symbol": symbol,
                 "timestamp": self.features[symbol]["timestamp"],
                 "mid_price": self.features[symbol]["mid_price"],
+                "micro_price": self.features[symbol]["micro_price"], # ✅ Published
                 "last_trade_price": self.features[symbol]["last_trade_price"],
                 "imbalance": self.features[symbol]["obi"], 
                 "tfi": self.features[symbol]["tfi"],
