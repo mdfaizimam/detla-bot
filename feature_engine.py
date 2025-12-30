@@ -16,6 +16,7 @@ from collections import deque
 import aiohttp 
 from redis import asyncio as aioredis
 import redis.exceptions 
+from concurrent.futures import ProcessPoolExecutor
 
 from config import (
     REDIS_URL, 
@@ -27,11 +28,12 @@ from config import (
     VOLUME_SMA_PERIOD,
     ATR_TIMEFRAME,
     SPOT_INDEX_SYMBOLS,
-    CONTROL_CHANNEL,
     LATEST_ENRICHED_KEY,
-    HEALTH_CHECK_KEY_FE 
+    HEALTH_CHECK_KEY_FE,
+    CONTROL_CHANNEL # ✅ Added
 )
 from utils.binance_client import get_latest_ls_ratio
+from multimodal_data_ingestion import MultimodalIngestor
 
 log = logging.getLogger("feature_engine")
 
@@ -44,6 +46,241 @@ RESOLUTION_SECONDS = {
     "1m": 60, "5m": 300, "15m": 900, "1h": 3600, 
     "4h": 14400, "1d": 86400, "1w": 604800,
 }
+
+
+# --- Standalone Calculation Task for Multiprocessing ---
+def calculate_technical_indicators_task(symbol: str, candle_history_snapshot: dict) -> dict:
+    """
+    Pure function to calculate indicators. Safe for ProcessPoolExecutor.
+    """
+    tas = {}
+    if not candle_history_snapshot: return tas
+
+    for timeframe, candle_data in candle_history_snapshot.items():
+        if len(candle_data) < 21: continue
+
+        try:
+            data = np.array(candle_data)
+            # Data Structure: [ts, open, high, low, close, volume]
+            if data.shape[0] == 0: continue
+            
+            close = data[:, 4]
+            high = data[:, 2]
+            low = data[:, 3]
+            volume = data[:, 5]
+            
+            def fast_ema(values, period):
+                alpha = 2 / (period + 1)
+                ema = np.empty_like(values)
+                ema[0] = values[0]
+                for i in range(1, len(values)):
+                    ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+                return ema[-1]
+
+            ema_20 = fast_ema(close, 20)
+            ema_50 = fast_ema(close, 50)
+            
+            # --- TFT FEATURES (Stationary) ---
+            # Log Returns
+            if len(close) > 1:
+                close_log_ret = np.log(close[-1] / (close[-2] + 1e-9))
+            else:
+                close_log_ret = 0.0
+                
+            # Volume Z-Score (Window 200 via Rolling Stats)
+            vol_window = 200
+            if len(volume) >= vol_window:
+                vol_slice = volume[-vol_window:]
+                v_mean = np.mean(vol_slice)
+                v_std = np.std(vol_slice)
+                vol_zscore = (volume[-1] - v_mean) / (v_std + 1e-9)
+            else:
+                vol_zscore = 0.0
+
+            # --- FAST RSI ---
+            def fast_rsi(prices, period=14):
+                if len(prices) < period + 1: return 50.0
+                deltas = np.diff(prices)
+                seed = deltas[:period]
+                up = seed[seed >= 0].sum() / period
+                down = -seed[seed < 0].sum() / period
+                if down == 0: return 100.0
+                rs = up / down
+                for delta in deltas[period:]:
+                    up = (up * (period - 1) + (delta if delta > 0 else 0)) / period
+                    down = (down * (period - 1) + (-delta if delta < 0 else 0)) / period
+                if down == 0: return 100.0
+                rs = up / down
+                return 100.0 - (100.0 / (1.0 + rs))
+
+            rsi_14 = fast_rsi(close, 14)
+            
+            # --- MACD ---
+            def get_ema_series(values, period):
+                alpha = 2 / (period + 1)
+                ema = np.zeros_like(values)
+                ema[0] = values[0]
+                for i in range(1, len(values)):
+                    ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+                return ema
+            
+            e12 = get_ema_series(close, 12)
+            e26 = get_ema_series(close, 26)
+            macd_line = e12 - e26
+            signal_line = get_ema_series(macd_line, 9)
+            macd_hist = macd_line[-1] - signal_line[-1]
+            
+            # --- ATR & ADX (Directional Movement) ---
+            # True Range Calculation
+            if len(close) > 1:
+                prev_close = np.roll(close, 1)
+                prev_close[0] = close[0]
+                tr1 = high - low
+                tr2 = np.abs(high - prev_close)
+                tr3 = np.abs(low - prev_close)
+                tr = np.maximum(tr1, np.maximum(tr2, tr3))
+                atr = fast_ema(tr, 14)
+            else:
+                tr = high - low
+                atr = (high[-1] - low[-1])
+            
+            # --- TRUE ADX IMPLEMENTATION (Welles Wilder) ---
+            adx_val = 20.0 # Default fallback
+            if len(close) > 28:
+                up_move = np.diff(high, prepend=high[0])
+                down_move = -np.diff(low, prepend=low[0])
+                
+                pdm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+                mdm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+                
+                # Wilder's Smoothing Helper
+                def wilders_smooth(values, period):
+                    # Initial is SMA
+                    smoothed = np.zeros_like(values)
+                    smoothed[period-1] = np.mean(values[:period])
+                    for i in range(period, len(values)):
+                        smoothed[i] = smoothed[i-1] - (smoothed[i-1]/period) + values[i]
+                    return smoothed
+
+                tr_s = wilders_smooth(tr, 14)
+                pdm_s = wilders_smooth(pdm, 14)
+                mdm_s = wilders_smooth(mdm, 14)
+                
+                # Avoid division by zero
+                tr_s = np.where(tr_s == 0, 1e-9, tr_s)
+                
+                pdi = 100 * (pdm_s / tr_s)
+                mdi = 100 * (mdm_s / tr_s)
+                
+                dx_denom = pdi + mdi
+                dx_denom = np.where(dx_denom == 0, 1e-9, dx_denom)
+                dx = 100 * np.abs(pdi - mdi) / dx_denom
+                
+                # Final ADX is smoothed DX
+                adx_series = wilders_smooth(dx, 14)
+                adx_val = adx_series[-1]
+
+            # --- Bollinger Bands ---
+            bb_period = 20
+            if len(close) >= bb_period:
+                sma20 = np.mean(close[-bb_period:])
+                std20 = np.std(close[-bb_period:])
+                bb_upper = sma20 + (2 * std20)
+                bb_lower = sma20 - (2 * std20)
+                bb_mid = sma20
+                bb_width = (bb_upper - bb_lower) / (bb_mid + 1e-9)
+            else:
+                bb_upper, bb_lower, bb_mid, bb_width = 0,0,0,0
+
+            # --- Kaufman Efficiency Ratio ---
+            er_period = 10
+            if len(close) > er_period:
+                change = np.abs(close[-1] - close[-er_period - 1])
+                volatility = np.sum(np.abs(np.diff(close[-er_period-1:])))
+                ker = change / (volatility + 1e-9)
+            else:
+                ker = 0.5
+
+            obv_change = np.sign(np.diff(close, prepend=close[0])) * volume
+            obv = np.sum(obv_change)
+            fractal_dim = atr / (np.std(close[-20:]) + 1e-9)
+
+            latest_tas = {
+                "ema_20": ema_20,
+                "ema_50": ema_50,
+                "rsi_14": rsi_14,
+                "macd_hist": macd_hist,
+                "close": close[-1],
+                "open": data[-1, 1],
+                "obv": obv,
+                "adx": adx_val, 
+                "ker": ker,
+                "fractal_dim": fractal_dim,
+                "bb_lower": bb_lower,
+                "bb_upper": bb_upper,
+                "bb_mid": bb_mid,
+                "bb_width": bb_width,
+                "atr": atr,
+                "atr_pct": (atr / (close[-1] + 1e-9)) * 100, 
+                "close_log_ret": close_log_ret, 
+                "vol_zscore": vol_zscore 
+            }
+            
+            if timeframe == VOLUME_TIMEFRAME:
+                latest_tas["volume"] = volume[-1]
+                if len(volume) >= VOLUME_SMA_PERIOD:
+                    latest_tas[f"SMA_volume_{VOLUME_SMA_PERIOD}"] = np.mean(volume[-VOLUME_SMA_PERIOD:])
+            
+            # --- GENIUS FEATURE: Volume Point of Control (POC) ---
+            dist_to_poc = 0.0
+            if len(close) > 50:
+                try:
+                    price_min = np.min(low[-1440:]) 
+                    price_max = np.max(high[-1440:])
+                    if price_max > price_min:
+                        bins = np.linspace(price_min, price_max, num=50)
+                        subset_close = close[-1440:]
+                        subset_vol = volume[-1440:]
+                        
+                        digitized = np.digitize(subset_close, bins)
+                        vol_profile = np.zeros(len(bins))
+                        for i in range(len(subset_close)):
+                            bin_idx = digitized[i] - 1
+                            if 0 <= bin_idx < len(bins):
+                                vol_profile[bin_idx] += subset_vol[i]
+                        
+                        poc_idx = np.argmax(vol_profile)
+                        poc_price = bins[poc_idx]
+                        
+                        current_price = subset_close[-1]
+                        if poc_price > 0:
+                            dist_to_poc = (current_price - poc_price) / poc_price
+                except Exception:
+                    pass
+
+            latest_tas["dist_to_poc"] = float(dist_to_poc)
+
+            if timeframe == "1d" and len(data) > 1:
+                prev_h = data[-2, 2]
+                prev_l = data[-2, 3]
+                prev_c = data[-2, 4]
+                
+                latest_tas["PMH"] = prev_h
+                latest_tas["PML"] = prev_l
+                
+                P = (prev_h + prev_l + prev_c) / 3
+                latest_tas["pivot"] = P
+                latest_tas["R1"] = (2 * P) - prev_l
+                latest_tas["S1"] = (2 * P) - prev_h
+                latest_tas["R2"] = P + (prev_h - prev_l)
+                latest_tas["S2"] = P - (prev_h - prev_l)
+
+            tas[timeframe] = latest_tas
+            
+        except Exception:
+            continue
+            
+    return tas
 
 class FeatureEngine:
     def __init__(self, redis_client: aioredis.Redis, http_session: aiohttp.ClientSession, top_n=5):
@@ -59,6 +296,8 @@ class FeatureEngine:
         self.symbol_ready_state = {}
         
         self.binance_cache = {}
+        self.multimodal_cache = {}  # ✅ Cache for Macro/Sentiment/Cross-Market
+        self.multimodal = MultimodalIngestor() # ✅ Init Ingestor
         self._binance_poll_task = None
         self.candle_regex = re.compile(r"candlestick_(\w+)")
         
@@ -66,16 +305,26 @@ class FeatureEngine:
         self._message_buffer = deque()
         self._priming_lock = asyncio.Lock()
         self.last_processed_timestamp = 0
+        
+        # ⚡ OPTIMIZATION: ProcessPool for Math Offloading
+        self.executor = ProcessPoolExecutor(max_workers=2)
 
     async def _poll_external_data(self):
-        log.info("🌍 Starting Binance Data Poller...")
+        log.info("🌍 Starting External Data Poller (Binance + Multimodal)...")
         while not self._stop_flag:
             try:
+                # 1. Binance Long/Short Ratio
                 for symbol in TRADING_SYMBOLS:
                     lsr = await get_latest_ls_ratio(self.session, symbol)
                     if lsr: 
                         self.binance_cache[f"{symbol}_lsr"] = lsr
-                await asyncio.sleep(60)
+                
+                # 2. Multimodal Snapshot (Macro, Sentiment, Cross-Market)
+                snapshot = await self.multimodal.fetch_snapshot()
+                if snapshot:
+                    self.multimodal_cache = snapshot
+                    
+                await asyncio.sleep(10) # Poll every 10s (Ingestor has internal caching)
             except Exception as e:
                 log.error(f"External poll error: {e}")
                 await asyncio.sleep(10)
@@ -193,7 +442,7 @@ class FeatureEngine:
                     log.error(f"Error priming {symbol} {res}: {e}")
         
         for symbol in TRADING_SYMBOLS:
-            self._calculate_technical_indicators(symbol)
+            await self._calculate_technical_indicators(symbol)
 
     def _validate_checksum(self, symbol: str, received_cs: int) -> bool:
         book = self.order_books.get(symbol)
@@ -312,7 +561,7 @@ class FeatureEngine:
             else:
                 break
 
-    def _handle_candlestick(self, data: dict):
+    async def _handle_candlestick(self, data: dict):
         symbol = data.get("symbol")
         msg_type = data.get("type")
         if not symbol or not msg_type: return
@@ -336,17 +585,17 @@ class FeatureEngine:
         
         if not history_deque:
             history_deque.append(candle_row)
-            self._calculate_technical_indicators(symbol)
+            await self._calculate_technical_indicators(symbol)
         else:
             last_ts = history_deque[-1][0]
             new_ts = candle_row[0]
             
             if new_ts > last_ts:
                 history_deque.append(candle_row)
-                self._calculate_technical_indicators(symbol)
+                await self._calculate_technical_indicators(symbol)
             elif new_ts == last_ts:
                 history_deque[-1] = candle_row
-                self._calculate_technical_indicators(symbol)
+                await self._calculate_technical_indicators(symbol)
 
     def _handle_funding_rate(self, data: dict):
         symbol = data.get("symbol")
@@ -404,195 +653,130 @@ class FeatureEngine:
 
             return obi, mid_price, micro_price
         except Exception: return 0.0, None, None
-            
-    def _calculate_tfi(self, symbol: str):
-        if symbol not in self.features: return 0.0
+
+    def _calculate_tfi(self, symbol: str) -> float:
+        """
+        Calculates Trend Forecast Indicator (TFI).
+        Simple deviation from EMA 50.
+        """
         try:
-            state = self.features[symbol]["tfi_state"]
-            buy_vol = state["buy_vol"]
-            sell_vol = state["sell_vol"]
-            denom = buy_vol + sell_vol
-            return (buy_vol - sell_vol) / denom if denom else 0.0
-        except Exception: return 0.0
+            tas = self.features.get(symbol, {}).get("tas", {}).get(VOLUME_TIMEFRAME, {})
+            close = tas.get("close")
+            ema_50 = tas.get("ema_50")
+            
+            if close and ema_50 and ema_50 > 0:
+                return ((close - ema_50) / ema_50) * 100
+            return 0.0
+        except Exception:
+            return 0.0
 
-    def _calculate_technical_indicators(self, symbol: str):
+    def _calculate_cross_asset_correlation(self, target_symbol: str, window=20) -> dict:
+        """
+        Calculates rolling correlation between target_symbol and other tracked assets.
+        Uses cached candle history (aligned by index).
+        """
+        correlations = {}
+        if target_symbol not in self.candle_history: return correlations
+        
+        # Get target projected returns
+        target_candles = list(self.candle_history[target_symbol][VOLUME_TIMEFRAME])
+        if len(target_candles) < window: return correlations
+        
+        # Extract closes: [ts, o, h, l, c, v] -> index 4 is close
+        target_closes = np.array([c[4] for c in target_candles[-window:]])
+        target_log_ret = np.diff(np.log(target_closes))
+
+        for other_symbol in TRADING_SYMBOLS:
+            if other_symbol == target_symbol: continue
+            if other_symbol not in self.candle_history: continue
+            
+            other_candles = list(self.candle_history[other_symbol][VOLUME_TIMEFRAME])
+            if len(other_candles) < window: continue
+            
+            # Align timestamps roughly (assuming synchronized 5m candles)
+            # In a partial system, we just take the last N. 
+            other_closes = np.array([c[4] for c in other_candles[-window:]])
+            other_log_ret = np.diff(np.log(other_closes))
+            
+            if len(target_log_ret) != len(other_log_ret):
+                # Simple truncation to match lengths
+                min_len = min(len(target_log_ret), len(other_log_ret))
+                t_ret = target_log_ret[-min_len:]
+                o_ret = other_log_ret[-min_len:]
+            else:
+                t_ret = target_log_ret
+                o_ret = other_log_ret
+            
+            # Pearson Correlation
+            if len(t_ret) > 2 and np.std(t_ret) > 1e-9 and np.std(o_ret) > 1e-9:
+                corr = np.corrcoef(t_ret, o_ret)[0, 1]
+                correlations[f"corr_{other_symbol}"] = corr
+            else:
+                correlations[f"corr_{other_symbol}"] = 0.0
+                
+        return correlations
+
+    def _estimate_liquidation_clusters(self, symbol: str) -> dict:
+        """
+        Estimates proximity to liquidation clusters based on Key Swing Levels.
+        Logic: Smart Money hunts liquidity at 10x/25x/50x distances from Swing Highs/Lows.
+        """
+        liq_data = {"dist_to_long_liq": 1.0, "dist_to_short_liq": 1.0}
+        
+        if symbol not in self.candle_history: return liq_data
+        
+        # Get Daily Candles for Swing Levels
+        daily_candles = list(self.candle_history[symbol]["1d"])
+        if len(daily_candles) < 30: return liq_data
+        
+        closes = np.array([c[4] for c in daily_candles])
+        highs = np.array([c[2] for c in daily_candles])
+        lows = np.array([c[3] for c in daily_candles])
+        current_price = closes[-1]
+        
+        # Find 30-day High/Low
+        swing_high = np.max(highs[-30:])
+        swing_low = np.min(lows[-30:])
+        
+        # Longs get liquidated below entry. Shorts get liquidated above entry.
+        # Assuming people entered at Swing High (Shorts) or Swing Low (Longs) is naive,
+        # but people trapped at the top ARE the liquidity.
+        
+        # Short Liquidation Clusters (Above Price) implies pushing price UP to kill shorts
+        # Shorts entered at Swing Low? No, Shorts entering NOW are targets.
+        # Actually, "Liquidity" is resting stops.
+        # STOPS are above Swing Highs (Short Stops) and below Swing Lows (Long Stops).
+        
+        # Distance to Swing High (Buy Stop Liquidity / Short Squeeze Fuel)
+        dist_to_swing_high = (swing_high - current_price) / current_price
+        
+        # Distance to Swing Low (Sell Stop Liquidity / Long Squeeze Fuel)
+        dist_to_swing_low = (current_price - swing_low) / current_price
+        
+        liq_data["dist_to_short_liq"] = dist_to_swing_high # Low value means close to squeezing shorts
+        liq_data["dist_to_long_liq"] = dist_to_swing_low   # Low value means close to dumping on longs
+        
+        return liq_data
+
+
+    async def _calculate_technical_indicators(self, symbol: str):
         if symbol not in self.candle_history: return 
-        tas = {} 
-
-        for timeframe, candle_deque in self.candle_history[symbol].items():
-            if len(candle_deque) < 21: continue
-
-            try:
-                data = np.array(candle_deque)
-                # Data Structure: [ts, open, high, low, close, volume]
-                close = data[:, 4]
-                high = data[:, 2]
-                low = data[:, 3]
-                volume = data[:, 5]
-                
-                def fast_ema(values, period):
-                    alpha = 2 / (period + 1)
-                    ema = np.empty_like(values)
-                    ema[0] = values[0]
-                    for i in range(1, len(values)):
-                        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
-                    return ema[-1]
-
-                ema_20 = fast_ema(close, 20)
-                ema_50 = fast_ema(close, 50)
-                
-                # --- FAST RSI ---
-                def fast_rsi(prices, period=14):
-                    if len(prices) < period + 1: return 50.0
-                    deltas = np.diff(prices)
-                    seed = deltas[:period]
-                    up = seed[seed >= 0].sum() / period
-                    down = -seed[seed < 0].sum() / period
-                    if down == 0: return 100.0
-                    rs = up / down
-                    for delta in deltas[period:]:
-                        up = (up * (period - 1) + (delta if delta > 0 else 0)) / period
-                        down = (down * (period - 1) + (-delta if delta < 0 else 0)) / period
-                    if down == 0: return 100.0
-                    rs = up / down
-                    return 100.0 - (100.0 / (1.0 + rs))
-
-                rsi_14 = fast_rsi(close, 14)
-                
-                # --- MACD ---
-                def get_ema_series(values, period):
-                    alpha = 2 / (period + 1)
-                    ema = np.zeros_like(values)
-                    ema[0] = values[0]
-                    for i in range(1, len(values)):
-                        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
-                    return ema
-                
-                e12 = get_ema_series(close, 12)
-                e26 = get_ema_series(close, 26)
-                macd_line = e12 - e26
-                signal_line = get_ema_series(macd_line, 9)
-                macd_hist = macd_line[-1] - signal_line[-1]
-                
-                # --- ATR & ADX (Directional Movement) ---
-                # True Range Calculation
-                if len(close) > 1:
-                    prev_close = np.roll(close, 1)
-                    prev_close[0] = close[0]
-                    tr1 = high - low
-                    tr2 = np.abs(high - prev_close)
-                    tr3 = np.abs(low - prev_close)
-                    tr = np.maximum(tr1, np.maximum(tr2, tr3))
-                    atr = fast_ema(tr, 14)
-                else:
-                    tr = high - low
-                    atr = (high[-1] - low[-1])
-                
-                # --- TRUE ADX IMPLEMENTATION (Welles Wilder) ---
-                adx_val = 20.0 # Default fallback
-                if len(close) > 28:
-                    up_move = np.diff(high, prepend=high[0])
-                    down_move = -np.diff(low, prepend=low[0])
-                    
-                    pdm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
-                    mdm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
-                    
-                    # Wilder's Smoothing Helper
-                    def wilders_smooth(values, period):
-                        # Initial is SMA
-                        smoothed = np.zeros_like(values)
-                        smoothed[period-1] = np.mean(values[:period])
-                        for i in range(period, len(values)):
-                            smoothed[i] = smoothed[i-1] - (smoothed[i-1]/period) + values[i]
-                        return smoothed
-
-                    tr_s = wilders_smooth(tr, 14)
-                    pdm_s = wilders_smooth(pdm, 14)
-                    mdm_s = wilders_smooth(mdm, 14)
-                    
-                    # Avoid division by zero
-                    tr_s = np.where(tr_s == 0, 1e-9, tr_s)
-                    
-                    pdi = 100 * (pdm_s / tr_s)
-                    mdi = 100 * (mdm_s / tr_s)
-                    
-                    dx_denom = pdi + mdi
-                    dx_denom = np.where(dx_denom == 0, 1e-9, dx_denom)
-                    dx = 100 * np.abs(pdi - mdi) / dx_denom
-                    
-                    # Final ADX is smoothed DX
-                    adx_series = wilders_smooth(dx, 14)
-                    adx_val = adx_series[-1]
-
-                # --- Bollinger Bands ---
-                bb_period = 20
-                if len(close) >= bb_period:
-                    sma20 = np.mean(close[-bb_period:])
-                    std20 = np.std(close[-bb_period:])
-                    bb_upper = sma20 + (2 * std20)
-                    bb_lower = sma20 - (2 * std20)
-                    bb_mid = sma20
-                    bb_width = (bb_upper - bb_lower) / bb_mid
-                else:
-                    bb_upper, bb_lower, bb_mid, bb_width = 0,0,0,0
-
-                # --- Kaufman Efficiency Ratio ---
-                er_period = 10
-                if len(close) > er_period:
-                    change = np.abs(close[-1] - close[-er_period - 1])
-                    volatility = np.sum(np.abs(np.diff(close[-er_period-1:])))
-                    ker = change / (volatility + 1e-9)
-                else:
-                    ker = 0.5
-
-                obv_change = np.sign(np.diff(close, prepend=close[0])) * volume
-                obv = np.sum(obv_change)
-                fractal_dim = atr / (np.std(close[-20:]) + 1e-9)
-
-                latest_tas = {
-                    "ema_20": ema_20,
-                    "ema_50": ema_50,
-                    "rsi_14": rsi_14,
-                    "macd_hist": macd_hist,
-                    "close": close[-1],
-                    "open": data[-1, 1],
-                    "obv": obv,
-                    "adx": adx_val, # ✅ True ADX
-                    "ker": ker,
-                    "fractal_dim": fractal_dim,
-                    "bb_lower": bb_lower,
-                    "bb_upper": bb_upper,
-                    "bb_mid": bb_mid,
-                    "bb_width": bb_width,
-                    "atr": atr,
-                    "atr_pct": (atr / close[-1]) * 100 # ✅ Volatility Normalization
-                }
-                
-                if timeframe == VOLUME_TIMEFRAME:
-                    latest_tas["volume"] = volume[-1]
-                    if len(volume) >= VOLUME_SMA_PERIOD:
-                        latest_tas[f"SMA_volume_{VOLUME_SMA_PERIOD}"] = np.mean(volume[-VOLUME_SMA_PERIOD:])
-                
-                if timeframe == "1d" and len(data) > 1:
-                    prev_h = data[-2, 2]
-                    prev_l = data[-2, 3]
-                    prev_c = data[-2, 4]
-                    
-                    self.features[symbol]["PMH"] = prev_h
-                    self.features[symbol]["PML"] = prev_l
-                    
-                    P = (prev_h + prev_l + prev_c) / 3
-                    latest_tas["pivot"] = P
-                    latest_tas["R1"] = (2 * P) - prev_l
-                    latest_tas["S1"] = (2 * P) - prev_h
-                    latest_tas["R2"] = P + (prev_h - prev_l)
-                    latest_tas["S2"] = P - (prev_h - prev_l)
-
-                tas[timeframe] = latest_tas
-                
-            except Exception as e:
-                log.error(f"Error calculating TA for {symbol} {timeframe}: {e}")
-        self.features[symbol]["tas"] = tas
+        
+        loop = asyncio.get_running_loop()
+        # Create lightweight snapshot for pickling
+        snapshot = {tf: list(dq) for tf, dq in self.candle_history[symbol].items()}
+        
+        try:
+            tas = await loop.run_in_executor(
+                self.executor, 
+                calculate_technical_indicators_task, 
+                symbol, 
+                snapshot
+            )
+            if tas:
+                self.features[symbol]["tas"] = tas
+        except Exception as e:
+            log.error(f"Async TA calc failed for {symbol}: {e}")
 
     async def _publish_features(self, symbol: str, timestamp_us: int):
         if symbol not in self.features: self._initialize_state(symbol)
@@ -601,7 +785,7 @@ class FeatureEngine:
         if mid_price is not None:
             self.features[symbol]["obi"] = obi
             self.features[symbol]["mid_price"] = mid_price
-            self.features[symbol]["micro_price"] = micro_price # ✅ Include Micro-Price
+            self.features[symbol]["micro_price"] = micro_price 
             
         self.features[symbol]["tfi"] = self._calculate_tfi(symbol)
         self.features[symbol]["timestamp"] = timestamp_us
@@ -609,6 +793,17 @@ class FeatureEngine:
         lsr_key = f"{symbol}_lsr"
         current_lsr = self.binance_cache.get(lsr_key, 1.0)
         self.features[symbol]["long_short_ratio"] = current_lsr
+        
+        # ✅ NEW: Calculate Multi-Modal Features
+        correlations = self._calculate_cross_asset_correlation(symbol)
+        liq_data = self._estimate_liquidation_clusters(symbol)
+        
+        # ✅ Funding Delta (ROC)
+        funding_rate = self.features[symbol].get("funding_rate", 0.0)
+        prev_funding = self.features[symbol].get("prev_funding", funding_rate)
+        # Store for next time
+        self.features[symbol]["prev_funding"] = funding_rate
+        funding_roc = funding_rate - prev_funding
 
         if self.features[symbol]["mid_price"] is not None:
             payload = {
@@ -616,18 +811,30 @@ class FeatureEngine:
                 "symbol": symbol,
                 "timestamp": self.features[symbol]["timestamp"],
                 "mid_price": self.features[symbol]["mid_price"],
-                "micro_price": self.features[symbol]["micro_price"], # ✅ Published
+                "micro_price": self.features[symbol]["micro_price"], 
                 "last_trade_price": self.features[symbol]["last_trade_price"],
                 "imbalance": self.features[symbol]["obi"], 
                 "tfi": self.features[symbol]["tfi"],
                 "mark_price": self.features[symbol]["mark_price"],
                 "funding_rate": self.features[symbol]["funding_rate"],
+                "funding_roc": funding_roc, # ✅ New Feature
                 "long_short_ratio": self.features[symbol]["long_short_ratio"],
                 "spot_price": self.features[symbol].get("spot_price"), 
                 "tas": self.features[symbol]["tas"],
                 "PMH": self.features[symbol].get("PMH"),
                 "PML": self.features[symbol].get("PML"),
             }
+            
+            # ✅ Add New Features to Payload
+            payload.update(correlations)
+            payload.update(liq_data)
+            
+            # ✅ MERGE MULTIMODAL DATA
+            if self.multimodal_cache:
+                mm_data = self.multimodal_cache.copy()
+                if "timestamp" in mm_data:
+                    del mm_data["timestamp"] 
+                payload.update(mm_data)
             try:
                 # ✅ FIX: Enable Numpy Serialization
                 await self.redis.set(f"{LATEST_ENRICHED_KEY}{symbol}", orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY), ex=300) 
@@ -666,7 +873,7 @@ class FeatureEngine:
                 self._handle_all_trades(raw)
                 should_publish = True
             elif msg_type.startswith("candlestick_"):
-                if not self._priming_lock.locked(): self._handle_candlestick(raw)
+                if not self._priming_lock.locked(): await self._handle_candlestick(raw)
             elif msg_type == "funding_rate":
                 self._handle_funding_rate(raw)
                 should_publish = True
@@ -731,4 +938,6 @@ class FeatureEngine:
             self._stop_flag = True
             if listener_task and not listener_task.done(): listener_task.cancel()
             if self._binance_poll_task: self._binance_poll_task.cancel()
+            await self.multimodal.close() # ✅ Cleanup Ingestor
+            self.executor.shutdown(wait=False) # ⚡ Cleanup Executor
             log.info("🔻 FeatureEngine stopped cleanly.")

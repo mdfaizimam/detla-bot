@@ -5,14 +5,17 @@
 # ✅ FIX: Increased Lock TTL to 300s to match Reconciler
 
 import asyncio
-import json
+import orjson
 import logging
 import time
+import csv
+import os
+from datetime import datetime
 from typing import Optional, Any, Dict, Tuple
 from redis import asyncio as aioredis
 from config import (
     DELTA_BASE_URL, API_KEY, API_SECRET, SIGNAL_CHANNEL, MONITORING_CHANNEL,
-    USER_AGENT, DMS_ID, TSL_ENABLED, TSL_CHANNEL, config,
+    USER_AGENT, DMS_ID, TSL_ENABLED, TSL_CHANNEL, config, TRADING_SYMBOLS,
     BRACKET_STOP_TRIGGER, BRACKET_ORDER_TYPE, REDIS_POSITION_LOCK_PREFIX
 )
 from utils.api_client import DeltaAPIClient
@@ -34,19 +37,76 @@ class OrderExecutionManager:
 
     async def start(self):
         logger.info("▶️ OrderExecutionManager starting (listening for signals)...")
+        
+        # 🛡️ Sync State on Boot
+        await self._sync_active_positions()
+        
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(SIGNAL_CHANNEL)
         try:
             async for msg in pubsub.listen():
                 if msg.get("type") != "message": continue
                 try:
-                    signal = json.loads(msg["data"])
+                    signal = orjson.loads(msg["data"])
                 except Exception: continue
                 asyncio.create_task(self._handle_signal(signal))
         except asyncio.CancelledError:
             logger.info("OrderExecutionManager cancelled.")
         finally:
             await pubsub.unsubscribe(SIGNAL_CHANNEL)
+
+    async def _sync_active_positions(self):
+        """
+        🛡️ CRITICAL: Checks for existing open positions on exchange at startup.
+        Restores monitoring and locks if the bot was restarted during a trade.
+        Uses product-id based fetching for reliability.
+        """
+        try:
+            logger.info("♻️ Syncing active positions from Exchange...")
+            count = 0
+            
+            # Iterate through all trading symbols to check positions specifically
+            # This is more robust than a global fetch which fails schema validation
+            for symbol in TRADING_SYMBOLS:
+                product_id = None
+                
+                # 1. Resolve Product ID
+                product_info = await self._get_product_info(symbol)
+                if product_info:
+                    product_id = product_info.get("id")
+                
+                if not product_id:
+                    logger.warning(f"Could not resolve product ID for {symbol}, skipping sync.")
+                    continue
+
+                # 2. Fetch Position for this specific product
+                status, response = await self.api_client.get("/v2/positions", params={"product_id": str(product_id)})
+                
+                if status != 200 or not response.get("success"):
+                    continue
+
+                result = response.get("result")
+                # Normalize result (can be list or dict)
+                target_pos = None
+                if isinstance(result, dict): target_pos = result
+                elif isinstance(result, list):
+                    for p in result:
+                        if float(p.get("size", 0)) != 0:
+                            target_pos = p
+                            break
+                            
+                if target_pos and float(target_pos.get("size", 0)) != 0:
+                    size = float(target_pos.get("size"))
+                    entry_price = float(target_pos.get("entry_price", 0))
+                    
+                    logger.info(f"♻️ Restoring state for {symbol} (Size: {size})")
+                    await self._notify_monitor(symbol, size, product_id)
+                    count += 1
+
+            logger.info(f"✅ Synced {count} active positions.")
+
+        except Exception as e:
+            logger.error(f"Error syncing positions: {e}", exc_info=True)
 
     async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         if symbol in self.product_info_cache:
@@ -76,7 +136,7 @@ class OrderExecutionManager:
     async def _acquire_position_lock(self, symbol: str, timeout: int = 5) -> bool:
         deadline = time.time() + timeout
         lock_key = f"{REDIS_POSITION_LOCK_PREFIX}{symbol}"
-        lock_value = json.dumps({"symbol": symbol, "ts": time.time()})
+        lock_value = orjson.dumps({"symbol": symbol, "ts": time.time()})
         while time.time() < deadline:
             ok = await self.redis.set(lock_key, lock_value, ex=self.REDIS_POSITION_LOCK_TTL, nx=True)
             if ok: return True
@@ -122,7 +182,11 @@ class OrderExecutionManager:
                 return
 
             side = "buy" if direction == "LONG" else "sell"
-            res = await self._place_linked_orders(symbol, side, int_size, tp_price, sl_price, product_info)
+            
+            ref_price = float(signal.get("trigger_price", 0))
+            if ref_price == 0: ref_price = tp_price # Fallback heuristic
+            
+            res = await self._place_linked_orders(symbol, side, int_size, tp_price, sl_price, product_info, ref_price)
             
             if not res:
                 await self._release_position_lock(symbol)
@@ -135,47 +199,162 @@ class OrderExecutionManager:
                 await self._notify_tsl_manager(symbol, ret_direction, int_size, product_id, filled_avg_price)
 
             logger.info("✅ Trade Executed for %s @ $%.2f. Lock HELD.", symbol, filled_avg_price)
+            
+            # Log to Journal
+            self._log_trade_journal({
+                "symbol": symbol,
+                "direction": direction,
+                "size": int_size,
+                "price": filled_avg_price,
+                "regime": signal.get("regime", "Unknown"),
+                "confidence": signal.get("confidence", 0),
+                "reasoning": signal.get("reasoning", {})
+            })
 
         except Exception as e:
             logger.error("❌ Error handling signal for %s: %s", symbol, e, exc_info=True)
             await self._release_position_lock(symbol)
 
-    async def _place_linked_orders(self, symbol, side, size, tp_price, sl_price, product_info) -> Optional[Tuple[int, str, float]]:
+    def _log_trade_journal(self, trade_data: dict):
+        try:
+            file_exists = os.path.isfile("logs/trade_journal.csv")
+            os.makedirs("logs", exist_ok=True)
+            
+            with open("logs/trade_journal.csv", "a", newline="") as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(["Timestamp", "Symbol", "Direction", "Size", "Price", "Regime", "Confidence", "Forecast", "VolZ", "FNG", "DXY_ROC", "VIX"])
+                
+                reasoning = trade_data.get("reasoning", {})
+                writer.writerow([
+                    datetime.now().isoformat(),
+                    trade_data.get("symbol"),
+                    trade_data.get("direction"),
+                    trade_data.get("size"),
+                    trade_data.get("price"),
+                    trade_data.get("regime"),
+                    trade_data.get("confidence"),
+                    reasoning.get("forecast", 0),
+                    reasoning.get("vol_zscore", 0),
+                    reasoning.get("fng", 0),
+                    reasoning.get("dxy_roc", 0),
+                    reasoning.get("vix", 0)
+                ])
+        except Exception as e:
+            logger.error(f"Failed to write to trade journal: {e}")
+
+            logger.error(f"Failed to write to trade journal: {e}")
+
+    async def _place_maker_entry(self, symbol: str, product_id: int, side: str, size: int, ref_price: float, max_slippage=0.005) -> Tuple[bool, float]:
+        """
+        🕵️ GENIUS EXECUTION: Smart Chase-Limit Logic
+        Places Limit Order at Best Bid/Ask. If not filled, chases price up to max_slippage.
+        Returns (Success, AvgFillPrice)
+        """
+        try:
+            # 1. Calculate Hard Limits
+            limit_cap = ref_price * (1 + max_slippage) if side == "buy" else ref_price * (1 - max_slippage)
+            
+            order_id = None
+            start_time = time.time()
+            attempt = 0
+            active_limit_price = 0.0 # Track locally to avoid GET 404s
+            
+            while time.time() - start_time < 20: # 20s Max Chase Time
+                attempt += 1
+                
+                # A. Get Fresh Ticker
+                status, resp = await self.api_client.get(f"/v2/tickers/{symbol}")
+                if status != 200: 
+                    await asyncio.sleep(1)
+                    continue
+                    
+                # Use Orderbook Top if available, else Mark
+                # Delta Ticker usually has 'ask' and 'bid'
+                ticker = resp.get("result", {})
+                best_bid = float(ticker.get("bid", 0) or ticker.get("spot_price", 0))
+                best_ask = float(ticker.get("ask", 0) or ticker.get("spot_price", 0))
+                
+                if best_bid == 0: # Fallback
+                    best_bid = best_ask = float(ticker.get("close", ref_price))
+
+                # B. Determine Price
+                # If BUY, we want to be Best Bid + 1 tick (Aggressive Maker) or just Best Bid
+                # To ensure fill, maybe Best Bid + small delta, but strictly < Best Ask
+                target_price = best_bid if side == "buy" else best_ask
+                
+                if side == "buy":
+                    if target_price > limit_cap: target_price = limit_cap # Cap
+                else:
+                    if target_price < limit_cap: target_price = limit_cap # Floor
+
+                # C. Check status / Chase
+                should_chase = False
+                if order_id:
+                     if side == "buy":
+                         if target_price > active_limit_price: should_chase = True
+                     else:
+                         if target_price < active_limit_price: should_chase = True
+                     
+                     if should_chase:
+                         logger.info(f"🏃 Chasing {side.upper()}: {active_limit_price} -> {target_price}")
+                         # Use correct DELETE payload
+                         await self.api_client.delete("/v2/orders", payload={"id": order_id, "product_id": product_id})
+                         order_id = None
+                         active_limit_price = 0.0
+                
+                # D. Place New Order if needed
+                if not order_id:
+                    price_str = f"{target_price:.6f}".rstrip('0').rstrip('.')
+                    
+                    payload = {
+                        "product_id": product_id,
+                        "size": size,
+                        "side": side,
+                        "order_type": "limit_order",
+                        "limit_price": price_str,
+                        "time_in_force": "gtc"
+                    }
+                    
+                    logger.info(f"🎯 Placing Smart Limit {side.upper()} @ {price_str}")
+                    s, r = await self.api_client.post("/v2/orders", payload)
+                    if s == 200 and r.get("success"):
+                         order_id = int(r["result"]["id"])
+                         active_limit_price = target_price # Update tracker
+                    else:
+                         logger.error(f"Failed to place chase limit: {r}")
+                         # Fallback to Market?
+                         return False, 0.0
+                
+                await asyncio.sleep(2)
+                
+            # Timeout - Cancel and convert to Market?
+            # --- GENIUS UPGRADE: DO NOT PANIC BUY ---
+            # Standard retail bots market buy here. Snipers abort to preserve R:R.
+            
+            logger.warning("⏰ Chase Timeout. Price moved too fast. ABORTING TRADE to preserve R:R.")
+            if order_id:
+                 await self.api_client.delete(f"/v2/orders/{order_id}")
+            
+            return False, 0.0 # Return Fail instead of Market Buy
+            
+        except Exception as e:
+            logger.error(f"Smart Execution Error: {e}")
+            return False, 0.0
+    async def _place_linked_orders(self, symbol, side, size, tp_price, sl_price, product_info, ref_price=0.0) -> Optional[Tuple[int, str, float]]:
         product_id = product_info["id"]
         precision = product_info["precision"]
         
-        # 1. Place Market Entry
-        entry_payload = {
-            "product_id": product_id,
-            "size": size,
-            "side": side,
-            "order_type": "market_order",
-        }
-        logger.info(f"📦 Placing Market Entry: {entry_payload}")
-        status, entry_resp = await self.api_client.post("/v2/orders", entry_payload)
+        # 1. Execute Entry (Smart Chase)
+        # Pass ref_price (mid/close from signal) to calculate Chase Caps
+        success, filled_price = await self._place_maker_entry(symbol, product_id, side, size, ref_price)
         
-        if status != 200 or not entry_resp.get("success"):
-            logger.error(f"❌ Market Entry Failed: {entry_resp}")
-            if entry_resp.get('error', {}).get('code') == 'insufficient_margin':
-                logger.critical("🛑 Insufficient Margin!")
+        if not success:
+            logger.error(f"❌ Entry Failed for {symbol}")
             return None
+            
+        logger.info(f"✅ Entry Filled: {symbol} @ {filled_price}")
         
-        order_id = entry_resp["result"]["id"]
-        filled_price = 0.0
-        
-        # ✅ FIX: Retry loop to get actual fill price
-        for _ in range(5):
-            await asyncio.sleep(1.0)
-            s, d = await self.api_client.get(f"/v2/orders/{order_id}")
-            if s == 200:
-                filled_price = float(d["result"].get("avg_fill_price", 0))
-                if filled_price > 0: break
-        
-        # Fallback if still zero (unlikely but safe)
-        if filled_price == 0: 
-            logger.warning("Filled price is 0.0, using trigger price")
-            filled_price = float(sl_price) # Just a placeholder to avoid crashes
-
         # 2. Place Bracket (TP/SL)
         sl_str = f"{sl_price:.{precision}f}"
         tp_str = f"{tp_price:.{precision}f}"
@@ -216,7 +395,7 @@ class OrderExecutionManager:
                 "product_id": int(product_id),
                 "timestamp": time.time(),
             }
-            await self.redis.publish(MONITORING_CHANNEL, json.dumps(message))
+            await self.redis.publish(MONITORING_CHANNEL, orjson.dumps(message))
         except Exception as e:
             logger.error("Failed to notify PositionMonitor: %s", e)
 
@@ -230,6 +409,6 @@ class OrderExecutionManager:
                 "product_id": int(product_id),
                 "entry_price": float(entry_price),
             }
-            await self.redis.publish(TSL_CHANNEL, json.dumps(payload))
+            await self.redis.publish(TSL_CHANNEL, orjson.dumps(payload))
         except Exception as e:
             logger.error("Failed to notify TSL Manager: %s", e)

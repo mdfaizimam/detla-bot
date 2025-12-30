@@ -39,6 +39,50 @@ class RiskManager:
         
         log.info(f"✅ RiskManager initialized: Max Drawdown={self.max_drawdown_pct*100}%, Daily Loss Limit={self.daily_loss_limit*100}%")
 
+    def calculate_dynamic_size(self, symbol: str, confidence: float, regime: str, base_size: float) -> int:
+        """
+        Calculates position size based on Confidence AND Volatility Regime.
+        Returns INTEGER contracts (floor 1).
+        Regime Logic:
+        - Low Vol (Calm): 1.0x (Standard)
+        - Med Vol (Trend): 1.5x (Aggressive)
+        - High Vol (Crash): 0.0x (Cash)
+        """
+        # 1. Regime Scaler
+        regime_scaler = 1.0
+        if "High Vol" in regime or "Crash" in regime:
+            regime_scaler = 0.0 # CASH IS A POSITION
+            log.warning(f"🛑 CRASH REGIME DETECTED! Sizing set to 0 for {symbol}")
+            return 0
+        elif "Med Vol" in regime or "Correction" in regime:
+            regime_scaler = 1.5 # Trending / Volatile Upside
+        
+        # 2. Confidence Scaler (Linear scaling)
+        conf_scaler = max(0.5, confidence)
+        
+        # 3. Raw Size
+        raw_size = base_size * conf_scaler * regime_scaler
+        
+        # 4. Integer Validation
+        final_size = int(max(1, raw_size))
+        
+        log.info(f"📏 Sizing {symbol}: Base={base_size} * Conf({conf_scaler:.2f}) * Reg({regime_scaler} - {regime}) = {raw_size:.2f} -> {final_size}")
+        return final_size
+
+    def get_adaptive_sl_multiplier(self, regime: str, base_mult=1.5) -> float:
+        """
+        Returns ATR multiplier for Stop Loss based on regime.
+        - Low Vol: Tight (Base)
+        - Med Vol: Loose (Base * 1.5)
+        - High Vol: Very Loose (Base * 2.0) - though we likely won't trade
+        """
+        if "Med Vol" in regime:
+            return base_mult * 1.5
+        elif "High Vol" in regime:
+            return base_mult * 2.0
+        return base_mult
+
+
     async def start(self):
         """Starts the daily reset loop task and syncs initial equity."""
         # ✅ Sync equity immediately on start to prevent Ghost Equity bug

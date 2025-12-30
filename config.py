@@ -25,6 +25,11 @@ DELTA_BASE_URL = "https://api.india.delta.exchange"
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 BINANCE_FUTURES_URL = "https://fapi.binance.com" 
 DMS_ID = os.getenv("DMS_ID", "default_trading_bot_dms")
+CONTROL_CHANNEL = "delta:control" # ✅ Centralized Control Channel
+
+# 🔒 SAFETY CONFIG
+PAPER_TRADING = False # 🚨 LIVE TRADING ACTIVATED
+MAX_CAPITAL_USAGE_PER_TRADE = 0.1 # 10% Risk Limit
 
 # ----------------------------------------------------------------------
 # ✅ Spot Index Symbols
@@ -78,7 +83,9 @@ CONFIDENCE_CEILING = 0.90
 # ----------------------------------------------------------------------
 ATR_TIMEFRAME = "5m"       
 SL_ATR_MULTIPLIER = 2.5     # ⬆️ INCREASED: Give trade room to breathe (was 2.0)
-TP_BUFFER_PCT = 0.001      
+ATR_TIMEFRAME = "5m"       
+SL_ATR_MULTIPLIER = 2.5     # ⬆️ INCREASED: Give trade room to breathe (was 2.0)
+TP_BUFFER_PCT = 0.005      # ✅ 0.5% Minimum Move (No Scalping)
 MIN_RISK_REWARD_RATIO = 1.5 
 
 # ----------------------------------------------------------------------
@@ -108,7 +115,7 @@ TSL_ACTIVATION_PCT = 0.005   # ✅ NEW: Prevents TSL from killing trade at entry
 # ----------------------------------------------------------------------
 DYNAMIC_CONFIDENCE_ENABLED = True
 BASE_CONFIDENCE = 0.65        # ⬆️ INCREASED from 0.55/0.50 to filter noise
-MIN_CONFIDENCE = 0.60          
+MIN_CONFIDENCE = 0.60          # ✅ OPTIMIZED: 60% Confidence for better Frequency
 VOLATILITY_SCALER = 2.0        
 
 # ----------------------------------------------------------------------
@@ -143,7 +150,8 @@ SIGNAL_CONFIDENCE = BASE_CONFIDENCE
 # ✅ Strategy Filters
 # ----------------------------------------------------------------------
 TREND_CHECK_ENABLED = True
-TREND_TIMEFRAME = "1h" 
+TREND_CHECK_ENABLED = True
+TREND_TIMEFRAME = "4h" # ✅ 4H Trend Authority 
 FUNDING_CHECK_ENABLED = True
 FUNDING_RATE_THRESHOLD = 0.0005 
 VOLUME_CHECK_ENABLED = True
@@ -152,6 +160,16 @@ VOLUME_SMA_PERIOD = 20
 VOLUME_SURGE_MULTIPLIER = 2.0 
 SNR_CHECK_ENABLED = True
 SNR_PROXIMITY_PCT = 0.002 
+
+# ----------------------------------------------------------------------
+# ✅ Trade Quality Score (TQS) System - NEW
+# ----------------------------------------------------------------------
+TQS_ENABLED = True                  # Enable/disable TQS system
+TQS_MODE = "percentile"             # "percentile" or "adaptive"
+TQS_PERCENTILE = 85                 # Take top 15% of signals (90 = top 10%)
+TQS_MIN_THRESHOLD = 0.55            # Never go below this
+TQS_MAX_THRESHOLD = 0.85            # Never go above this
+TQS_HISTORY_SIZE = 500              # Rolling window for threshold calculation
 
 # ----------------------------------------------------------------------
 # ✅ Order Execution Parameters
@@ -256,4 +274,12 @@ config = {
     "CONFIDENCE_CEILING": CONFIDENCE_CEILING,
     "MIN_SIZE_MULTIPLIER": MIN_SIZE_MULTIPLIER,
     "MAX_SIZE_MULTIPLIER": MAX_SIZE_MULTIPLIER
+,
+    # ✅ TQS System
+    "TQS_ENABLED": TQS_ENABLED,
+    "TQS_MODE": TQS_MODE,
+    "TQS_PERCENTILE": TQS_PERCENTILE,
+    "TQS_MIN_THRESHOLD": TQS_MIN_THRESHOLD,
+    "TQS_MAX_THRESHOLD": TQS_MAX_THRESHOLD,
+    "TQS_HISTORY_SIZE": TQS_HISTORY_SIZE
 }

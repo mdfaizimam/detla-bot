@@ -16,3 +16,10 @@ plotly       # Interactive Charts
 watchdog     # For Streamlit auto-reload
 xgboost
 lightgbm
+# ✅ NEW: Multimodal Data Sources
+yfinance
+ccxt
+vaderSentiment
+requests
+# ✅ NEW: Deep Learning
+torch

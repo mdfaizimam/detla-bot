@@ -98,11 +98,16 @@ class DeltaAPIClient:
                         return status, response_json
                     
                     if status == 401:
-                        # Hard Kill Switch for IP Issues
+                        # Retry Logic for IP Issues
                         error_code = response_json.get("error", {}).get("code")
                         if error_code == "ip_not_whitelisted_for_api_key":
-                            logger.critical("🚨 FATAL ERROR: IP Address is NOT whitelisted. Stopping bot immediately.")
-                            sys.exit(1)
+                            if attempt < self.max_retries:
+                                logger.warning(f"🚨 IP Not Whitelisted (Attempt {attempt}/{self.max_retries}). Retrying in {self.retry_delay}s...")
+                                await asyncio.sleep(self.retry_delay)
+                                continue
+                            else:
+                                logger.critical("🚨 FATAL ERROR: IP Address is NOT whitelisted after 3 attempts. Stopping bot.")
+                                sys.exit(1)
 
                         logger.warning(
                             f"Server expected signature data: {response_json.get('error', {}).get('context', {}).get('signature_data')}"

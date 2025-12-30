@@ -1,7 +1,3 @@
-# --- detla-bot/historical_data_fetcher.py ---
-# FIXED: Reduced L/S fetch window to 28 days to prevent HTTP 400 errors.
-# FIXED: Skips Candle fetching if file already exists (saves time).
-# FIXED: Improved error handling for Binance API.
 
 import asyncio
 import aiohttp
@@ -9,274 +5,330 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import logging
-import json
-import shutil
-import argparse
 import time
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
 import aiofiles
-from io import StringIO
-import os
+import yfinance as yf 
 
 # ----------------------------------------------------------------------
 # Configuration
 # ----------------------------------------------------------------------
-try:
-    from config import DELTA_BASE_URL, BINANCE_FUTURES_URL, USER_AGENT
-except ImportError:
-    DELTA_BASE_URL = "https://api.delta.exchange"
-    BINANCE_FUTURES_URL = "https://fapi.binance.com"
-    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+DELTA_BASE_URL = "https://api.delta.exchange"
+BINANCE_FUTURES_URL = "https://fapi.binance.com"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
-DEFAULT_DAYS_TO_FETCH = 365
-TRAINING_TIMEFRAME = "5m"
-FETCH_CHUNK_DAYS = 6
-DEFAULT_DATA_DIR = Path("data")
-DEFAULT_TRADING_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD"]
-SYMBOL_MAPPING = {
-    "BTCUSD": {"delta": "BTCUSD", "binance": "BTCUSDT"},
-    "ETHUSD": {"delta": "ETHUSD", "binance": "ETHUSDT"},
-    "SOLUSD": {"delta": "SOLUSD", "binance": "SOLUSDT"}
-}
-HTTP_TIMEOUT = 15
+# 3 Years of Data
+DAYS_TO_FETCH = 1095 
+DATA_DIR = Path("data")
+TARGET_ASSETS = ["BTC", "ETH", "SOL"]
 
 # ----------------------------------------------------------------------
 # Logging
 # ----------------------------------------------------------------------
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] [%(name)s]: %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(LOG_DIR / "data_fetcher.log", encoding="utf-8")
-    ]
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [FETCHER]: %(message)s")
 log = logging.getLogger("data_fetcher")
 
-# ----------------------------------------------------------------------
-# Retry Logic
-# ----------------------------------------------------------------------
-def async_retry(max_attempts: int = 3, delay: float = 1.0):
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(max_attempts):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    if attempt == max_attempts - 1:
-                        log.error(f"❌ {func.__name__} failed after {max_attempts} attempts: {e}")
-                        raise e
-                    log.warning(f"⚠️ {func.__name__} attempt {attempt+1} failed: {e}. Retrying in {current_delay}s...")
-                    await asyncio.sleep(current_delay)
-                    current_delay *= 2
-        return wrapper
-    return decorator
+class HistoricalDataFetcher:
+    def __init__(self):
+        self.session = None
+        self.valid_symbols = {} # Map 'BTC' -> 'BTCUSD'
+        DATA_DIR.mkdir(exist_ok=True)
 
-# ----------------------------------------------------------------------
-# Data Fetching Logic
-# ----------------------------------------------------------------------
-@async_retry()
-async def fetch_candle_chunk(session, symbol, start, end):
-    params = {
-        "symbol": symbol, "resolution": TRAINING_TIMEFRAME, 
-        "start": str(start), "end": str(end), "limit": "2000"
-    }
-    async with session.get(f"{DELTA_BASE_URL}/v2/history/candles", params=params, headers={"User-Agent": USER_AGENT}) as resp:
-        if resp.status != 200: return []
-        data = await resp.json()
-        return data.get("result", [])
+    async def _init_session(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession(headers={"User-Agent": USER_AGENT})
 
-@async_retry()
-async def fetch_binance_ls_paginated(session, symbol, start_ts, end_ts):
-    """
-    Fetches Long/Short Ratio using strict pagination (500 limit).
-    """
-    binance_symbol = SYMBOL_MAPPING.get(symbol, {}).get("binance", f"{symbol[:-3]}USDT")
-    all_data = []
-    current_start = start_ts
-    
-    # Loop until we reach end_ts
-    while current_start < end_ts:
-        params = {
-            "symbol": binance_symbol, 
-            "period": "5m", 
-            "limit": 500,
-            "startTime": current_start,
-            "endTime": end_ts
-        }
+    async def close(self):
+        if self.session:
+            await self.session.close()
+
+    async def validate_delta_symbols(self):
+        """Validates which symbols are active on Delta Exchange using robust string matching."""
+        log.info("🔍 Validating symbols with Delta Exchange...")
+        await self._init_session()
         
         try:
-            url = f"{BINANCE_FUTURES_URL}/futures/data/globalLongShortAccountRatio"
-            async with session.get(url, params=params) as resp:
-                if resp.status == 429:
-                    log.warning(f"Binance Rate Limit! Sleeping 5s...")
-                    await asyncio.sleep(5)
-                    continue
-                
+            async with self.session.get(f"{DELTA_BASE_URL}/v2/products") as resp:
                 if resp.status != 200:
-                    text = await resp.text()
-                    log.warning(f"{symbol}: L/S fetch failed HTTP {resp.status} - {text}")
-                    break
-                
-                data = await resp.json()
-                if not isinstance(data, list) or not data:
-                    break # No more data
-                
-                all_data.extend(data)
-                
-                # Update pagination cursor
-                last_ts = data[-1]['timestamp']
-                # If we aren't moving forward, force a jump (prevent infinite loop)
-                if last_ts <= current_start:
-                    current_start += (500 * 5 * 60 * 1000) # 500 candles * 5 mins
-                else:
-                    current_start = last_ts + 300000 # +5 mins
-                
-                await asyncio.sleep(0.1) # Be nice to API
+                    log.error(f"❌ Failed to fetch product list. Status: {resp.status}")
+                    return False
                     
+                data = await resp.json()
+                products = data.get("result", [])
+                all_symbols = set(p.get("symbol") for p in products)
+                
+                self.valid_symbols = {}
+                for asset in TARGET_ASSETS:
+                    target_usd = f"{asset}USD"
+                    target_usdt = f"{asset}USDT"
+                    
+                    if target_usd in all_symbols:
+                        self.valid_symbols[asset] = target_usd
+                        log.info(f"✅ Found valid symbol for {asset}: {target_usd}")
+                    elif target_usdt in all_symbols:
+                        self.valid_symbols[asset] = target_usdt
+                        log.info(f"✅ Found valid symbol for {asset}: {target_usdt}")
+                    else:
+                        log.warning(f"⚠️ Could not find {target_usd} or {target_usdt} on Delta.")
+                
+                return bool(self.valid_symbols)
         except Exception as e:
-            log.error(f"{symbol}: Pagination error: {e}")
-            break
-            
-    return all_data
+            log.error(f"Symbol validation crashed: {e}")
+            return False
 
-# ----------------------------------------------------------------------
-# Orchestrators
-# ----------------------------------------------------------------------
-async def fetch_candles_orchestrator(session, symbol, days):
-    log.info(f"🕯️ Fetching candles for {symbol}...")
-    end = int(time.time())
-    start = int((datetime.now() - timedelta(days=days)).timestamp())
-    
-    chunks = []
-    current = end
-    step = 6 * 86400 # 6 day chunks
-    
-    while current > start:
-        chunk_start = max(start, current - step)
-        data = await fetch_candle_chunk(session, symbol, chunk_start, current)
-        if data: chunks.extend(data)
-        current = chunk_start
-        await asyncio.sleep(0.1)
-
-    if not chunks: return pd.DataFrame()
-    
-    df = pd.DataFrame(chunks)
-    tcol = "time" if "time" in df.columns else "timestamp"
-    df["time"] = pd.to_datetime(df[tcol], unit="s")
-    df = df.sort_values("time").drop_duplicates(subset=["time"])
-    
-    cols = ["open", "high", "low", "close", "volume"]
-    for c in cols: df[c] = pd.to_numeric(df[c], errors="coerce")
-    
-    df["symbol"] = symbol
-    return df
-
-async def fetch_sentiment_orchestrator(session, symbols, days):
-    log.info("🧠 Fetching Sentiment Data (Funding + L/S Ratio)...")
-    
-    funding_list = []
-    ls_list = []
-    
-    end_ts = int(time.time() * 1000)
-    
-    # ✅ FIX: Reduced to 28 days to prevent HTTP 400 (Binance strict limit)
-    ls_start_ts = int((datetime.now() - timedelta(days=28)).timestamp() * 1000)
-    
-    fund_start_ts = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
-    
-    for symbol in symbols:
-        binance_sym = SYMBOL_MAPPING[symbol]["binance"]
-        
-        # 1. Funding Rates
+    async def fetch_macro_data(self):
+        """Fetches VIX and DXY using yfinance (Daily resolution)"""
+        log.info("🌍 Fetching Macro Data (VIX, DXY)...")
         try:
-            url = f"{BINANCE_FUTURES_URL}/fapi/v1/fundingRate"
-            params = {"symbol": binance_sym, "startTime": fund_start_ts, "endTime": end_ts, "limit": 1000}
-            async with session.get(url, params=params) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if isinstance(data, list):
-                        for d in data: d["symbol"] = symbol
-                        funding_list.extend(data)
-                        log.info(f"  ✅ {symbol}: Fetched {len(data)} funding records.")
-        except Exception as e: log.error(f"Funding fetch error {symbol}: {e}")
+            # Run blocking call in thread
+            await asyncio.to_thread(self._fetch_macro_sync)
+        except Exception as e:
+            log.error(f"❌ Macro data fetch failed: {e}")
 
-        # 2. Long/Short Ratio
-        log.info(f"  ⏳ {symbol}: Fetching L/S Ratio (Last 28 Days)...")
-        ls_data = await fetch_binance_ls_paginated(session, symbol, ls_start_ts, end_ts)
-        if ls_data:
-            for d in ls_data: d["symbol"] = symbol
-            ls_list.extend(ls_data)
-            log.info(f"  ✅ {symbol}: Fetched {len(ls_data)} L/S records.")
+    def _fetch_macro_sync(self):
+        start_date = (datetime.now() - timedelta(days=DAYS_TO_FETCH)).strftime('%Y-%m-%d')
+        tickers = ["^VIX", "DX-Y.NYB"]
+        data = yf.download(tickers, start=start_date, interval="1d", progress=False)
+        
+        if isinstance(data.columns, pd.MultiIndex):
+            df = data['Close'].reset_index()
         else:
-            log.warning(f"  ⚠️ {symbol}: No L/S data found.")
-
-    return pd.DataFrame(funding_list), pd.DataFrame(ls_list)
-
-async def save_df(df, path):
-    if df.empty: return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    async with aiofiles.open(path, "w") as f:
-        await f.write(df.to_csv(index=False))
-    log.info(f"💾 Saved {len(df)} rows to {path.name}")
-
-# ----------------------------------------------------------------------
-# Main
-# ----------------------------------------------------------------------
-async def run_fetcher(symbols=DEFAULT_TRADING_SYMBOLS, days=365, auto_start=False, output_dir=DEFAULT_DATA_DIR):
-    # Check if candles already exist to save time
-    candle_path = Path(output_dir) / "historical_candles.csv"
-    skip_candles = False
-    
-    if candle_path.exists():
-        if auto_start:
-            skip_candles = True
-            log.info("⏩ Found existing candles. Skipping candle fetch (Sentiments Only).")
-        else:
-            print("\nFound existing candle data. Skip candle fetch? (y/n)")
-            if input().lower() == 'y': 
-                skip_candles = True
-
-    async with aiohttp.ClientSession() as session:
-        # 1. Fetch Candles (If needed)
-        if not skip_candles:
-            all_candles = []
-            for sym in symbols:
-                df = await fetch_candles_orchestrator(session, sym, days)
-                if not df.empty: all_candles.append(df)
+            df = data.reset_index()
             
-            if all_candles:
-                final_candles = pd.concat(all_candles).drop_duplicates(subset=["time", "symbol"]).sort_values("time")
-                await save_df(final_candles, candle_path)
+        df.columns = [str(col).replace("DX-Y.NYB", "dxy_close").replace("^VIX", "vix_close") for col in df.columns]
+        
+        # Normalize date column
+        for col in ['Datetime', 'Date']:
+            if col in df.columns: 
+                df.rename(columns={col: 'timestamp'}, inplace=True)
+                break
+        
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
+            
+        # Save
+        path = DATA_DIR / "historical_macro.csv"
+        df.to_csv(path, index=False)
+        log.info(f"💾 Saved {len(df)} macro rows to {path.resolve()}")
 
-        # 2. Fetch Sentiment (Always run this to fix L/S)
-        funding_df, ls_df = await fetch_sentiment_orchestrator(session, symbols, days)
+    async def fetch_candles(self):
+        """Fetches 3 years of 5m candles for all valid symbols concurrently."""
+        tasks = [self._fetch_single_symbol_candles(sym) for sym in self.valid_symbols.values()]
+        results = await asyncio.gather(*tasks)
         
-        await save_df(funding_df, Path(output_dir) / "historical_funding_rates.csv")
-        
-        if not ls_df.empty:
-            ls_path = Path(output_dir) / "historical_long_short_ratio.csv"
-            # Standardize columns
-            if "longShortRatio" in ls_df.columns:
-                ls_df = ls_df[["symbol", "timestamp", "longShortRatio", "longAccount", "shortAccount"]]
-            await save_df(ls_df, ls_path)
+        valid = [df for df in results if not df.empty]
+        if valid:
+            final_df = pd.concat(valid)
+            path = DATA_DIR / "historical_candles.csv"
+            await self._save_df(final_df, path)
         else:
-            log.error("❌ Still no L/S Data. Check Binance API availability.")
-            # Create dummy to prevent training crash
-            dummy = pd.DataFrame(columns=["symbol", "timestamp", "longShortRatio", "longAccount", "shortAccount"])
-            dummy.to_csv(Path(output_dir) / "historical_long_short_ratio.csv", index=False)
+            log.error("❌ No candles fetched!")
 
-    print("\n✅ Data Fetch Complete.")
+    async def _fetch_single_symbol_candles(self, symbol):
+        log.info(f"🕯️ Fetching Candles for {symbol}...")
+        end = int(time.time())
+        start = int((datetime.now() - timedelta(days=DAYS_TO_FETCH)).timestamp())
+        
+        current = end
+        step = 518400 # 6 days
+        chunks = []
+        
+        while current > start:
+            chunk_start = max(start, current - step)
+            params = {
+                "symbol": symbol, "resolution": "5m", 
+                "start": str(chunk_start), "end": str(current), "limit": "2000"
+            }
+            try:
+                async with self.session.get(f"{DELTA_BASE_URL}/v2/history/candles", params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        result = data.get("result", [])
+                        if result: chunks.extend(result)
+            except Exception as e:
+                log.warning(f"⚠️ Candle chunk failed: {e}")
+            
+            current = chunk_start
+            await asyncio.sleep(0.05)
+            
+        if not chunks: return pd.DataFrame()
+        
+        df = pd.DataFrame(chunks)
+        tcol = "time" if "time" in df.columns else "timestamp"
+        df["time"] = pd.to_datetime(df[tcol], unit="s")
+        df = df.sort_values("time").drop_duplicates(subset=["time"])
+        for c in ["open", "high", "low", "close", "volume"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        df["symbol"] = symbol
+        return df
+
+    async def fetch_binance_metrics(self):
+        """Fetches L/S Ratio and Open Interest using Backwards Pagination."""
+        # Need to map Delta Symbols (BTCUSD) to Binance (BTCUSDT)
+        binance_symbols = [f"{asset}USDT" for asset in self.valid_symbols.keys()]
+        
+        # 1. L/S Ratio
+        await self._fetch_metric_group(binance_symbols, "ls", "historical_long_short_ratio.csv")
+        # 2. Open Interest
+        await self._fetch_metric_group(binance_symbols, "oi", "historical_open_interest.csv")
+
+    async def _fetch_metric_group(self, symbols, metric_type, filename):
+        tasks = [self._fetch_single_metric_backwards(sym, metric_type) for sym in symbols]
+        results = await asyncio.gather(*tasks)
+        
+        valid = [df for df in results if not df.empty]
+        if valid:
+            final_df = pd.concat(valid)
+            path = DATA_DIR / filename
+            await self._save_df(final_df, path)
+
+    async def _fetch_single_metric_backwards(self, symbol, metric_type):
+        meta = {
+            "ls": ("/futures/data/globalLongShortAccountRatio", "⚖️ L/S Ratio"),
+            "oi": ("/futures/data/openInterestHist", "📊 Open Interest")
+        }
+        endpoint, label = meta[metric_type]
+        log.info(f"{label} Fetching history for {symbol}...")
+        
+        limit_ts = int((datetime.now() - timedelta(days=DAYS_TO_FETCH)).timestamp() * 1000)
+        current_end = int(time.time() * 1000)
+        all_data = []
+        
+        while current_end > limit_ts:
+            url = f"{BINANCE_FUTURES_URL}{endpoint}"
+            params = {"symbol": symbol, "period": "5m", "limit": 500, "endTime": current_end}
+            
+            try:
+                async with self.session.get(url, params=params) as resp:
+                    if resp.status == 429:
+                        log.warning("🔥 Rate Limit! Sleeping 5s...")
+                        await asyncio.sleep(5)
+                        continue
+                    if resp.status != 200:
+                        break # Stop on error (likely end of data)
+                    
+                    data = await resp.json()
+                    if not data: break
+                    
+                    all_data.extend(data)
+                    oldest_ts = data[0]['timestamp']
+                    if oldest_ts >= current_end: break # Prevent infinite loop
+                    current_end = oldest_ts - 1
+                    
+                    await asyncio.sleep(0.05)
+            except Exception:
+                break
+
+        if not all_data: return pd.DataFrame()
+        
+        df = pd.DataFrame(all_data)
+        # Normalize to internal format: BTCUSDT -> BTCUSD
+        df['symbol'] = symbol.replace("USDT", "USD")
+        
+        # Clean columns
+        if metric_type == "ls" and 'longShortRatio' in df.columns:
+            df = df[['symbol', 'timestamp', 'longShortRatio', 'longAccount', 'shortAccount']]
+        elif metric_type == "oi" and 'sumOpenInterest' in df.columns:
+            df = df[['symbol', 'timestamp', 'sumOpenInterest', 'sumOpenInterestValue']]
+            
+        return df
+
+    async def fetch_funding(self):
+        """Fetches Funding Rates efficiently using robust backwards windows."""
+        binance_symbols = [f"{asset}USDT" for asset in self.valid_symbols.keys()]
+        tasks = [self._fetch_single_funding(sym) for sym in binance_symbols]
+        results = await asyncio.gather(*tasks)
+        
+        valid = [df for df in results if not df.empty]
+        if valid:
+            final_df = pd.concat(valid)
+            # Dedup based on time/symbol
+            final_df = final_df.drop_duplicates(subset=['symbol', 'fundingTime'])
+            path = DATA_DIR / "historical_funding_rates.csv"
+            await self._save_df(final_df, path)
+
+    async def _fetch_single_funding(self, symbol):
+        log.info(f"💸 Fetching Funding for {symbol}...")
+        url = f"{BINANCE_FUTURES_URL}/fapi/v1/fundingRate"
+        all_data = []
+        
+        # Strategy: 
+        # First request: Don't specify endTime (get latest real-world data).
+        # Subsequent requests: Use the oldest timestamp from previous batch.
+        # This handles cases where System Time > Real Time (Simulated Env).
+        
+        current_end_time = None 
+        
+        for i in range(5): 
+            params = {"symbol": symbol, "limit": 1000}
+            if current_end_time:
+                params["endTime"] = current_end_time
+                
+            try:
+                async with self.session.get(url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if not data: 
+                            log.warning(f"   No data for {symbol} (Iter {i})")
+                            break
+                        
+                        all_data.extend(data)
+                        
+                        # Debug Log
+                        first_ts = data[0]['fundingTime']
+                        last_ts = data[-1]['fundingTime']
+                        log.info(f"   {symbol} Chunk {i}: {len(data)} rows. Range: {datetime.fromtimestamp(first_ts/1000)} -> {datetime.fromtimestamp(last_ts/1000)}")
+                        
+                        # Move cursor back
+                        oldest_ts = min(d['fundingTime'] for d in data)
+                        current_end_time = oldest_ts - 1
+                        
+                        await asyncio.sleep(0.1)
+                    else:
+                        log.warning(f"   Failed {symbol} funding fetch: {resp.status}")
+                        break
+            except Exception as e:
+                log.error(f"   Error fetching funding: {e}")
+                break
+                
+        if not all_data: return pd.DataFrame()
+        df = pd.DataFrame(all_data)
+        df['symbol'] = symbol.replace("USDT", "USD")
+        return df
+
+    async def _save_df(self, df, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Use simple synchronous save or thread for simplicity in "God Mode" runner
+        # But keeping asyncio logic for consistency
+        async with aiofiles.open(path, "w") as f:
+            await f.write(df.to_csv(index=False))
+        log.info(f"💾 Saved {len(df)} rows to {path.resolve()}")
+
+    async def run(self):
+        await self._init_session()
+        
+        # 1. Macro
+        await self.fetch_macro_data()
+        
+        # 2. Validate
+        if not await self.validate_delta_symbols():
+            await self.close()
+            return
+            
+        # 3. Candles
+        await self.fetch_candles()
+        
+        # 4. Metrics (L/S, OI)
+        await self.fetch_binance_metrics()
+        
+        # 5. Funding
+        await self.fetch_funding()
+        
+        await self.close()
+        print("\n✅ GOD MODE DATA FETCH COMPLETE.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--auto", default="no")
-    parser.add_argument("--days", type=int, default=365)
-    args = parser.parse_args()
-    
-    asyncio.run(run_fetcher(days=args.days, auto_start=(args.auto=="yes")))
+    fetcher = HistoricalDataFetcher()
+    asyncio.run(fetcher.run())
