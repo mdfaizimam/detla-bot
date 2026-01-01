@@ -1,0 +1,49 @@
+2026-01-01 22:45:04,789 [INFO] [TRANSFORMER]: \u26a1 Quick mode enabled: TFT epochs=1, RL steps=1000
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \U0001f680 Starting Hybrid Training Pipeline
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \u2699\ufe0f  Configuration: TFT epochs=1, RL steps=1000
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \U0001f4c2 Working directory: C:\deltaBot\Bot\detla-bot
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \U0001f4e5 Step 1: Loading data...
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \U0001f4c2 Found data file: fused_data_real_FULL.csv (size: 229.00 MB)
+2026-01-01 22:45:04,797 [INFO] [TRANSFORMER]: \U0001f4ca Loading data from: fused_data_real_FULL.csv
+2026-01-01 22:45:07,684 [INFO] [TRANSFORMER]: \u2705 Loaded with optimized dtypes for memory efficiency
+2026-01-01 22:45:07,939 [INFO] [TRANSFORMER]: \U0001f4c8 Data range: 2024-02-08 23:55:00 to 2026-01-01 00:00:00
+2026-01-01 22:45:07,942 [INFO] [TRANSFORMER]: \U0001f4ca Total duration: 692 days
+2026-01-01 22:45:11,332 [INFO] [TRANSFORMER]: \u2139\ufe0f  Generated 'time_idx' for TFT model
+2026-01-01 22:45:11,363 [WARNING] [TRANSFORMER]: \u26a0\ufe0f  Data still contains 26 NaN values. Force filling with 0.
+2026-01-01 22:45:11,363 [ERROR] [TRANSFORMER]: \u274c Failed to load data: Cannot setitem on a Categorical with a new category (0.0), set the categories first
+2026-01-01 22:45:11,369 [ERROR] [TRANSFORMER]: Traceback (most recent call last):
+  File "C:\deltaBot\Bot\detla-bot\train_hybrid.py", line 150, in load_data
+    df = DataLoader._preprocess_data(df)
+  File "C:\deltaBot\Bot\detla-bot\train_hybrid.py", line 250, in _preprocess_data
+    df_clean = df_clean.fillna(0.0)
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 7457, in fillna
+    new_data = self._mgr.fillna(
+        value=value, limit=limit, inplace=inplace, downcast=downcast
+    )
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\internals\base.py", line 186, in fillna
+    return self.apply_with_block(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        "fillna",
+        ^^^^^^^^^
+    ...<5 lines>...
+        already_warned=_AlreadyWarned(),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\internals\managers.py", line 363, in apply
+    applied = getattr(b, f)(**kwargs)
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\internals\blocks.py", line 2407, in fillna
+    new_values = self.values.fillna(value=value, method=None, limit=limit)
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\arrays\_mixins.py", line 376, in fillna
+    self._validate_setitem_value(value)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\arrays\categorical.py", line 1590, in _validate_setitem_value
+    return self._validate_scalar(value)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\arrays\categorical.py", line 1615, in _validate_scalar
+    raise TypeError(
+    ...<2 lines>...
+    ) from None
+TypeError: Cannot setitem on a Categorical with a new category (0.0), set the categories first
+
+2026-01-01 22:45:11,379 [ERROR] [TRANSFORMER]: \u274c Failed to load data. Exiting.

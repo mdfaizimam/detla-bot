@@ -1,7 +1,7 @@
 # --- detla-bot/generate_training_data.py ---
-# 🧠 GENIUS DATA FUSER (FIXED PATHS & ALIGNMENT)
-# Fixes 0.0 values by correctly aligning jagged date ranges
-# and robustly finding data files on Windows/Linux.
+# 🧠 INSTITUTIONAL DATA FUSER (MULTI-TIMEFRAME EDITION)
+# Merges Candles, Spot, Funding, and Macro.
+# Generates 1H and 4H context features from 5m data.
 
 import pandas as pd
 import numpy as np
@@ -13,225 +13,199 @@ import os
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [DATA_GEN]: %(message)s")
 log = logging.getLogger("data_gen")
 
-# --------------------------------------------------------------------------------
-# 1. ROBUST PATH DETECTION
-# --------------------------------------------------------------------------------
-def get_data_dir():
-    # Check common locations for the data folder
-    candidates = [
-        Path("data"),                   # Running from inside detla-bot/
-        Path("detla-bot/data"),         # Running from project root
-        Path("../data"),                # Running from nested folder
-        Path("C:/deltaBot/Bot/detla-bot/data") # Absolute fallback
-    ]
-    
-    for path in candidates:
-        if path.exists() and path.is_dir():
-            log.info(f"📂 Found data directory at: {path.resolve()}")
-            return path
-            
-    log.error("❌ Could not find 'data' directory. Please ensure 'data' folder exists.")
-    return Path("data") # Default fallback
+DATA_DIR = Path("data")
+OUTPUT_FILE = "fused_data_real_FULL.csv"
 
-DATA_DIR = get_data_dir()
-OUTPUT_FILE = "fused_data_real.csv"
-
-# --------------------------------------------------------------------------------
-# 2. SYMBOL MAPPING
-# --------------------------------------------------------------------------------
-def map_symbol(delta_symbol, target_df):
-    """
-    Tries to find the matching symbol in the target dataframe (e.g., BTCUSD -> BTCUSDT)
-    """
-    targets = target_df['symbol'].unique()
+def load_csv(filename):
+    path = DATA_DIR / filename
+    if not path.exists():
+        log.error(f"❌ Missing file: {path}")
+        return None
     
-    # 1. Exact Match
-    if delta_symbol in targets:
-        return delta_symbol
-    
-    # 2. Try appending 'T' (BTCUSD -> BTCUSDT)
-    if delta_symbol + "T" in targets:
-        return delta_symbol + "T"
-        
-    # 3. Try removing 'T' (BTCUSDT -> BTCUSD)
-    if delta_symbol.endswith("T") and delta_symbol[:-1] in targets:
-        return delta_symbol[:-1]
-
-    # 4. Try replace variants
-    usdt_var = delta_symbol.replace("USD", "USDT")
-    if usdt_var in targets: return usdt_var
-    
-    usd_var = delta_symbol.replace("USDT", "USD")
-    if usd_var in targets: return usd_var
-        
-    return None
-
-def process_single_symbol(symbol, candles, funding, ls_ratio):
-    log.info(f"  Processing {symbol}...")
-    
-    # 1. Base Data: Candles (Keep all history)
-    df = candles[candles['symbol'] == symbol].copy()
-    if df.empty:
-        log.warning(f"  ⚠️ No candle data for {symbol}")
-        return pd.DataFrame()
-    
-    # Sort by time to be safe
-    df = df.sort_values('time')
-
-    # 2. Prepare Ancillary Data (Funding)
-    f_sym = pd.DataFrame()
-    if not funding.empty:
-        mapped_sym = map_symbol(symbol, funding)
-        if mapped_sym:
-            f_sym = funding[funding['symbol'] == mapped_sym].copy()
-            f_sym = f_sym.sort_values('fundingTime')
-            # Log the date range overlap
-            f_start = f_sym['fundingTime'].min()
-            c_start = df['time'].min()
-            if f_start > c_start:
-                log.warning(f"    ⚠️ Funding data starts later ({f_start}) than candles ({c_start}). Early rows will have 0.0 funding.")
-
-    # 3. Prepare Ancillary Data (L/S Ratio)
-    l_sym = pd.DataFrame()
-    if not ls_ratio.empty:
-        mapped_sym = map_symbol(symbol, ls_ratio)
-        if mapped_sym:
-            l_sym = ls_ratio[ls_ratio['symbol'] == mapped_sym].copy()
-            l_sym = l_sym.sort_values('timestamp')
-
-    # 4. Smart Merge (Left Join on Candles)
-    # Use merge_asof to find the most recent known value ('backward') or nearest
-    
-    # Merge Funding
-    if not f_sym.empty:
-        df = pd.merge_asof(df, f_sym[['fundingTime', 'fundingRate']], 
-                           left_on='time', right_on='fundingTime', 
-                           direction='backward', tolerance=pd.Timedelta("8h"))
-        df['fundingRate'] = df['fundingRate'].fillna(0.0)
-        df.drop(columns=['fundingTime'], inplace=True)
-    else:
-        df['fundingRate'] = 0.0
-
-    # Merge L/S Ratio
-    if not l_sym.empty:
-        df = pd.merge_asof(df, l_sym[['timestamp', 'longShortRatio']], 
-                           left_on='time', right_on='timestamp', 
-                           direction='nearest', tolerance=pd.Timedelta("30min"))
-        # Default L/S to 1.0 (Neutral) if missing
-        df['longShortRatio'] = df['longShortRatio'].fillna(1.0)
-        df.drop(columns=['timestamp'], inplace=True)
-    else:
-        df['longShortRatio'] = 1.0
-
-    # ---------------------------------------------------------
-    # 🧠 FEATURE ENGINEERING
-    # ---------------------------------------------------------
-    
-    # 1. Advanced Sentinel Features
-    df['funding_roc'] = df['fundingRate'].diff().fillna(0.0) * 1000 
-    
-    # 2. Price Action / Volatility
-    df['close_log_ret'] = np.log(df['close'] / df['close'].shift(1)).fillna(0)
-    
-    # Robust Volume Z-Score (Avoid div by zero)
-    roll_mean = df['volume'].rolling(200).mean()
-    roll_std = df['volume'].rolling(200).std().replace(0, 1) # Prevent div/0
-    df['vol_zscore'] = (df['volume'] - roll_mean) / roll_std
-    
-    # 3. Liquidity Clusters (Swing Highs/Lows)
-    # Rolling 7 days (2016 * 5m candles)
-    roll_max = df['high'].rolling(2016).max()
-    roll_min = df['low'].rolling(2016).min()
-    
-    # Handle NaN at start of rolling window
-    df['dist_to_short_liq'] = ((roll_max - df['close']) / df['close']).fillna(0.0)
-    df['dist_to_long_liq'] = ((df['close'] - roll_min) / df['close']).fillna(0.0)
-    
-    # 4. Magnet (POC / VWAP)
-    # Simple Volume Weighted Average Price over 24h (288 * 5m)
-    roll_pv = (df['close'] * df['volume']).rolling(288).sum()
-    roll_v = df['volume'].rolling(288).sum().replace(0, 1)
-    df['vwap_24h'] = roll_pv / roll_v
-    df['dist_to_poc'] = ((df['close'] - df['vwap_24h']) / df['vwap_24h']).fillna(0.0)
-    
-    # 5. Order Book Imbalance (Proxy)
-    df['obi'] = np.sign(df['close_log_ret']) * np.log1p(df['volume']) / 10.0
-    
-    # 6. Global Macro Defaults
-    df['vix'] = 20.0
-    df['dxy_roc'] = 0.0
-    df['fear_greed_norm'] = 0.5
-    
-    # Cleanup all NaNs just in case
-    df = df.replace([np.inf, -np.inf], 0).fillna(0.0)
-    
+    df = pd.read_csv(path)
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
+# --------------------------------------------------------------------------------
+# 🛠️ HELPER: RESAMPLING ENGINE
+# --------------------------------------------------------------------------------
+def calculate_mtf_features(df_5m, interval, suffix):
+    """
+    Resamples 5m data to 'interval' (e.g., '1h', '4h'), calculates trends,
+    and returns a DataFrame ready to be merged back.
+    """
+    # 1. Resample
+    df_resampled = df_5m.set_index('timestamp').resample(interval).agg({
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum'
+    })
+    
+    # 2. Calculate Indicators on this timeframe
+    # A. Trend (EMA 20 vs EMA 50)
+    ema_fast = df_resampled['close'].ewm(span=20, adjust=False).mean()
+    ema_slow = df_resampled['close'].ewm(span=50, adjust=False).mean()
+    df_resampled[f'trend_bias_{suffix}'] = (ema_fast - ema_slow) / ema_slow # Normalized Trend
+    
+    # B. Volatility (ATR Normalized)
+    tr = np.maximum(df_resampled['high'] - df_resampled['low'], 
+                    np.abs(df_resampled['high'] - df_resampled['close'].shift(1)))
+    atr = tr.rolling(14).mean()
+    df_resampled[f'volatility_{suffix}'] = atr / df_resampled['close']
+    
+    # C. Momentum (RSI)
+    delta = df_resampled['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rs = gain / loss
+    df_resampled[f'rsi_{suffix}'] = 100 - (100 / (1 + rs))
+    
+    # Reset index for merging
+    df_resampled = df_resampled.reset_index()
+    
+    # Keep only the timestamp and the new features
+    return df_resampled[['timestamp', f'trend_bias_{suffix}', f'volatility_{suffix}', f'rsi_{suffix}']]
+
+# --------------------------------------------------------------------------------
+# 2. CORE PROCESSING
+# --------------------------------------------------------------------------------
+def process_symbol_group(base_asset, candles, spot, funding, macro):
+    log.info(f"🔹 Processing {base_asset}...")
+    
+    # 1. Filter Futures Candles (Target)
+    c_df = candles[candles['base_asset'] == base_asset].copy()
+    if c_df.empty: return pd.DataFrame()
+    c_df = c_df.sort_values('timestamp')
+
+    # 2. Filter Spot Candles (For Basis)
+    s_df = spot[spot['base_asset'] == base_asset].copy()
+    s_df = s_df.sort_values('timestamp')
+    
+    # 3. Filter Funding (Regime)
+    f_df = funding[funding['base_asset'] == base_asset].copy()
+    f_df = f_df.sort_values('timestamp')
+
+    # ---------------------------------------------------------
+    # 🕒 MULTI-TIMEFRAME GENERATION (The Genius Part)
+    # ---------------------------------------------------------
+    # Generate 1-Hour Context
+    mtf_1h = calculate_mtf_features(c_df, '1h', '1h')
+    
+    # Generate 4-Hour Context
+    mtf_4h = calculate_mtf_features(c_df, '4h', '4h')
+
+    # ---------------------------------------------------------
+    # 🔗 FUSION (Smart Merge)
+    # ---------------------------------------------------------
+    
+    # Merge Spot (Nearest match within 5m)
+    df = pd.merge_asof(c_df, s_df[['timestamp', 'spot_close', 'spot_volume']],
+                       on='timestamp', direction='nearest', tolerance=pd.Timedelta("5m"))
+    
+    # Merge Funding (Backward: Last known funding rate)
+    df = pd.merge_asof(df, f_df[['timestamp', 'funding_rate']],
+                       on='timestamp', direction='backward', tolerance=pd.Timedelta("8h"))
+    
+    # Merge Macro (Broadcast daily/5m macro)
+    df = pd.merge_asof(df, macro[['timestamp', 'vix_close', 'dxy_close']],
+                       on='timestamp', direction='backward', tolerance=pd.Timedelta("1d"))
+
+    # ✅ Merge MTF 1H (Backward: e.g. 10:15 sees 10:00 candle data)
+    df = pd.merge_asof(df, mtf_1h, on='timestamp', direction='backward')
+
+    # ✅ Merge MTF 4H (Backward)
+    df = pd.merge_asof(df, mtf_4h, on='timestamp', direction='backward')
+
+    # ---------------------------------------------------------
+    # 🧮 FEATURE CALCULATION
+    # ---------------------------------------------------------
+    
+    # A. Basis
+    df['basis'] = (df['close'] - df['spot_close']) / df['spot_close']
+    
+    # B. Funding Regime
+    df['funding_roc'] = df['funding_rate'].diff().fillna(0) * 1000
+    
+    # C. Price Action
+    df['close_log_ret'] = np.log(df['close'] / df['close'].shift(1)).fillna(0)
+    
+    # D. Volume Z-Score
+    roll_mean = df['volume'].rolling(288).mean() # 24h
+    roll_std = df['volume'].rolling(288).std().replace(0, 1)
+    df['vol_zscore'] = (df['volume'] - roll_mean) / roll_std
+    
+    # E. Order Book Imbalance Proxy
+    df['obi'] = np.sign(df['basis']) * np.log1p(df['volume']) / 10.0
+    
+    # F. Liquidity Levels
+    window_7d = 2016 
+    roll_max = df['high'].rolling(window_7d).max()
+    roll_min = df['low'].rolling(window_7d).min()
+    df['dist_to_long_liq'] = ((df['close'] - roll_min) / df['close'])
+    df['dist_to_short_liq'] = ((roll_max - df['close']) / df['close'])
+    
+    # G. Macro Features
+    df['dxy_roc'] = df['dxy_close'].pct_change().fillna(0) * 100
+    df['fear_greed_norm'] = (df['vix_close'] - 10) / 20.0
+    
+    # H. Market Structure
+    df['oi_pct_change'] = df['volume'].pct_change(288).fillna(0)
+    
+    # I. Dummy Placeholders
+    df['longShortRatio'] = 1.0 
+    df['dist_to_poc'] = 0.0 
+    
+    # Cleanup NaNs (caused by rolling windows and MTF resampling lag)
+    df = df.dropna()
+    
+    # Sanitize Infinite values
+    df = df.replace([np.inf, -np.inf], 0)
+    
+    log.info(f"   ✅ {base_asset}: Generated {len(df)} MTF-aligned rows.")
+    return df
+
+# --------------------------------------------------------------------------------
+# 3. MAIN RUNNER
+# --------------------------------------------------------------------------------
 def generate_real_data():
-    log.info("📂 Loading Real Historical Data...")
+    log.info("🚀 Starting Institutional Data Fusion (MTF Edition)...")
     
-    # Load Candles
-    c_path = DATA_DIR / "historical_candles.csv"
-    f_path = DATA_DIR / "historical_funding_rates.csv"
-    l_path = DATA_DIR / "historical_long_short_ratio.csv"
-
-    if not c_path.exists():
-        log.error(f"❌ No candles found at {c_path.resolve()}! Did you run the fetcher?")
+    # Load Source Files
+    candles = load_csv("historical_candles.csv")
+    spot = load_csv("historical_spot_candles.csv")
+    funding = load_csv("historical_funding_rates.csv")
+    macro = load_csv("historical_macro.csv")
+    
+    if any(x is None for x in [candles, spot, funding, macro]):
+        log.error("❌ Aborting. Missing input files.")
         return
 
-    try:
-        all_candles = pd.read_csv(c_path)
-        # Handle various time column names
-        t_col = 'time' if 'time' in all_candles.columns else 'timestamp'
-        all_candles.rename(columns={t_col: 'time'}, inplace=True)
-        all_candles['time'] = pd.to_datetime(all_candles['time'])
-        all_candles = all_candles.sort_values(['symbol', 'time'])
-        log.info(f"✅ Loaded {len(all_candles)} candles.")
-    except Exception as e:
-        log.error(f"Failed to load candles: {e}")
-        return
+    # Forward Fill Macro
+    macro = macro.sort_values('timestamp').set_index('timestamp').resample('5min').ffill().reset_index()
 
-    # Load Funding
-    all_funding = pd.DataFrame()
-    if f_path.exists():
-        all_funding = pd.read_csv(f_path)
-        if 'fundingTime' in all_funding.columns:
-            all_funding['fundingTime'] = pd.to_datetime(all_funding['fundingTime'], unit='ms')
-        log.info(f"✅ Loaded {len(all_funding)} funding rates.")
-
-    # Load LS
-    all_ls = pd.DataFrame()
-    if l_path.exists():
-        all_ls = pd.read_csv(l_path)
-        if 'timestamp' in all_ls.columns:
-            all_ls['timestamp'] = pd.to_datetime(all_ls['timestamp'], unit='ms')
-        log.info(f"✅ Loaded {len(all_ls)} L/S ratios.")
-
-    # Process
     fused_dfs = []
-    symbols = all_candles['symbol'].unique()
     
-    for sym in symbols:
-        df = process_single_symbol(sym, all_candles, all_funding, all_ls)
+    assets = candles['base_asset'].unique()
+    for asset in assets:
+        df = process_symbol_group(asset, candles, spot, funding, macro)
         if not df.empty:
             fused_dfs.append(df)
             
     if not fused_dfs:
-        log.error("❌ No data processed.")
+        log.error("❌ No valid data generated.")
         return
 
-    final_df = pd.concat(fused_dfs).sort_values('time')
-    final_df.rename(columns={'time': 'timestamp'}, inplace=True)
+    final_df = pd.concat(fused_dfs).sort_values('timestamp')
     
-    # Stats
-    log.info("🔍 Data Validation:")
-    log.info(f"   Rows: {len(final_df)}")
-    n_funding = (final_df['fundingRate'] != 0).sum()
-    log.info(f"   Funding Non-Zero: {n_funding} / {len(final_df)} ({n_funding/len(final_df):.1%})")
+    log.info("🔍 Final Validation:")
+    log.info(f"   Total Rows: {len(final_df)}")
+    log.info(f"   Features: {list(final_df.columns)}")
     
-    # Save to current directory (not data dir) for the trainer to find easily
     final_df.to_csv(OUTPUT_FILE, index=False)
-    log.info(f"✅ Generated training data: {Path(OUTPUT_FILE).resolve()}")
+    log.info(f"✅ SUCCESS! MTF Training data saved to: {Path(OUTPUT_FILE).resolve()}")
 
 if __name__ == "__main__":
     generate_real_data()
