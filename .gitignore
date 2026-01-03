@@ -9,7 +9,7 @@ model_v3/
 model_institutional/
 
 # Logs
-logs/
+logs folder/
 
 # Python
 __pycache__/
@@ -21,3 +21,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Other
+gitignore folder/
