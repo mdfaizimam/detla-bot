@@ -1,3 +1,7 @@
+# --- detla-bot/historical_data_fetcher.py ---
+# 🧠 INSTITUTIONAL DATA FETCHER (World Class Upgrade)
+# Fetches Candles, Funding, Spot Data + ORDER FLOW (CVD)
+
 import asyncio
 import aiohttp
 import pandas as pd
@@ -16,7 +20,7 @@ import sys
 # ----------------------------------------------------------------------
 # Toggle based on your region
 DELTA_BASE_URL = "https://api.india.delta.exchange"
-#DELTA_BASE_URL = "https://api.delta.exchange"
+# DELTA_BASE_URL = "https://api.delta.exchange"
 
 BINANCE_SPOT_URL = "https://api.binance.com"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -114,16 +118,13 @@ class HistoricalDataFetcher:
             data = await self.fetch_json(f"{DELTA_BASE_URL}/v2/products")
             products = data.get("result", [])
             
+            self.symbol_map = {}
             for asset in TARGET_ASSETS:
                 candidates = []
                 for p in products:
                     if p.get("contract_type") != "perpetual_futures" or p.get("state") != "live":
                         continue
                         
-                    # Robust Asset Matching
-                    # 1. Check top-level 'base_asset_symbol'
-                    # 2. Check nested 'underlying_asset' -> 'symbol'
-                    # 3. Check symbol string start
                     p_base = p.get("base_asset_symbol")
                     if not p_base:
                         ua = p.get("underlying_asset")
@@ -135,8 +136,7 @@ class HistoricalDataFetcher:
                     if (p_base == asset) or (not p_base and p_symbol.startswith(asset)):
                          candidates.append(p)
 
-                # Prioritize SOLUSD (USD Quote) over SOLUSDT (USDT Quote)
-                # Sort key: 0 if symbol exactly matches "{ASSET}USD", 1 else
+                # Prioritize USD Inverse
                 target_exact = f"{asset}USD"
                 candidates.sort(key=lambda x: 0 if x.get("symbol") == target_exact else 1)
                 
@@ -144,7 +144,6 @@ class HistoricalDataFetcher:
                     chosen = candidates[0]
                     delta_sym = chosen.get("symbol")
                     if not delta_sym:
-                         log.warning(f"⚠️ Found candidate for {asset} but 'symbol' key missing.")
                          continue
 
                     self.symbol_map[asset] = {
@@ -155,9 +154,6 @@ class HistoricalDataFetcher:
                 else:
                     log.warning(f"⚠️ No live perpetuals found for {asset} on Delta.")
             
-            
-            # Debug: Print the final map
-            print(f"DEBUG: Final Symbol Map: {self.symbol_map}")
             return bool(self.symbol_map)
         except Exception as e:
             log.error(f"Symbol validation crashed: {e}")
@@ -196,7 +192,7 @@ class HistoricalDataFetcher:
                     all_data.extend(result)
                     timestamps = [r.get("time", 0) for r in result]
                     oldest = min(timestamps)
-                    current = oldest - 1 # Adaptive Stepping
+                    current = oldest - 1 
                 else:
                     current = chunk_start - 1
             except Exception as e:
@@ -220,14 +216,8 @@ class HistoricalDataFetcher:
         df["base_asset"] = asset
         df = df[df['volume'] > 0]
         
-        # Enforce Ordering
-        df = df.sort_values("timestamp")
-        
-        return df
+        return df.sort_values("timestamp")
 
-    # ------------------------------------------------------------------
-    # 4. Delta Funding Rates
-    # ------------------------------------------------------------------
     # ------------------------------------------------------------------
     # 4. Delta Funding Rates
     # ------------------------------------------------------------------
@@ -238,7 +228,6 @@ class HistoricalDataFetcher:
         self._concat_and_save(results, "historical_funding_rates.csv")
 
     async def _fetch_single_delta_funding(self, asset, symbol):
-        # Use FUNDING:SYMBOL format with candles endpoint
         funding_symbol = f"FUNDING:{symbol}"
         log.info(f"💸 Fetching Delta Funding: {funding_symbol}...")
         
@@ -246,14 +235,14 @@ class HistoricalDataFetcher:
         start_ts = int((datetime.now(timezone.utc) - timedelta(days=DAYS_TO_FETCH)).timestamp())
         
         current = end_ts
-        chunk_step_fallback = 2592000 # 30 days
+        chunk_step_fallback = 2592000 
         all_data = []
         
         while current > start_ts:
             chunk_start = max(start_ts, current - chunk_step_fallback)
             params = {
                 "symbol": funding_symbol, 
-                "resolution": "1h", # 1h resolution for funding
+                "resolution": "1h", 
                 "start": str(chunk_start), 
                 "end": str(current), 
                 "limit": "4000"
@@ -261,7 +250,6 @@ class HistoricalDataFetcher:
             try:
                 data = await self.fetch_json(f"{DELTA_BASE_URL}/v2/history/candles", params=params)
                 result = data.get("result", [])
-                
                 if result:
                     all_data.extend(result)
                     timestamps = [r.get("time", 0) for r in result]
@@ -271,36 +259,26 @@ class HistoricalDataFetcher:
                     current = chunk_start - 1
                     
             except Exception as e:
-                log.warning(f"⚠️ Funding Chunk failed for {funding_symbol}: {e}")
                 current = chunk_start - 1
             
             await asyncio.sleep(0.1)
 
         if not all_data: 
-            log.warning(f"⚠️ No Funding History found for {funding_symbol}")
             return pd.DataFrame()
 
         df = pd.DataFrame(all_data)
-        
-        # Parse Timestamp
         tcol = "time" if "time" in df.columns else "timestamp"
         df["timestamp"] = pd.to_datetime(df[tcol], unit="s")
         if tcol != "timestamp": df.drop(columns=[tcol], inplace=True)
         
-        # Expected funding fields from candle: open/high/low/close are likely the rate
-        # We will use 'close' as the funding rate
         df["funding_rate"] = pd.to_numeric(df["close"], errors="coerce")
-        
-        # Keep only relevant columns
-        keep_cols = ["timestamp", "funding_rate"]
-        df = df[keep_cols]
-        
+        df = df[["timestamp", "funding_rate"]]
         df["symbol"] = symbol
         df["base_asset"] = asset
         return df.sort_values("timestamp")
 
     # ------------------------------------------------------------------
-    # 5. Binance Spot (Basis)
+    # 5. Binance Spot (Basis + CVD Orderflow)
     # ------------------------------------------------------------------
     async def fetch_binance_spot(self):
         tasks = [self._fetch_single_binance_spot(asset, meta['binance_spot']) 
@@ -309,7 +287,7 @@ class HistoricalDataFetcher:
         self._concat_and_save(results, "historical_spot_candles.csv")
 
     async def _fetch_single_binance_spot(self, asset, symbol):
-        log.info(f"🪙 Fetching Binance Spot: {symbol}...")
+        log.info(f"🪙 Fetching Binance Spot (with Orderflow): {symbol}...")
         url = f"{BINANCE_SPOT_URL}/api/v3/klines"
         
         limit_ts = int((datetime.now(timezone.utc) - timedelta(days=DAYS_TO_FETCH)).timestamp() * 1000)
@@ -337,8 +315,13 @@ class HistoricalDataFetcher:
         if not all_data: return pd.DataFrame()
         
         df = pd.DataFrame(all_data)
-        df = df.iloc[:, :6] 
-        df.columns = ["timestamp", "spot_open", "spot_high", "spot_low", "spot_close", "spot_volume"]
+        
+        # ✅ KEY UPGRADE: Fetch Index 9 (Taker Buy Volume) for CVD
+        # Format: [Time, Open, High, Low, Close, Volume, ..., TakerBuyBaseVol]
+        # Indexes: 0, 1, 2, 3, 4, 5, ..., 9
+        df = df.iloc[:, [0, 1, 2, 3, 4, 5, 9]] 
+        df.columns = ["timestamp", "spot_open", "spot_high", "spot_low", "spot_close", "spot_volume", "taker_buy_vol"]
+        
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
         
         for c in df.columns:
@@ -385,7 +368,6 @@ class HistoricalDataFetcher:
     # Utils
     # ------------------------------------------------------------------
     def _validate_dataframe(self, df, name):
-        """Hard Schema Guards"""
         if df.empty: return False
         if not df["timestamp"].is_monotonic_increasing:
             log.warning(f"⚠️ {name} is not sorted monotonically. Sorting now.")
@@ -402,7 +384,6 @@ class HistoricalDataFetcher:
             subset = ["symbol", "timestamp"] if "symbol" in final.columns else ["timestamp"]
             final = final.sort_values("timestamp").drop_duplicates(subset=subset)
             
-            # Guard against Future Data
             server_dt = datetime.fromtimestamp(self.server_time_s, tz=timezone.utc).replace(tzinfo=None)
             final = final[final["timestamp"] <= server_dt]
 
@@ -418,7 +399,6 @@ class HistoricalDataFetcher:
 
     async def run(self):
         await self._init_session()
-        
         try:
             # 1. Sync Time
             self.server_time_s = await self.get_delta_server_time()
@@ -427,7 +407,7 @@ class HistoricalDataFetcher:
             # 2. Validate
             if not await self.validate_delta_symbols():
                 return
-                
+            
             # 3. Parallel Fetch
             await asyncio.gather(
                 self.fetch_delta_candles(),

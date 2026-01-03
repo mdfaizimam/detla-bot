@@ -1,0 +1,88 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+2026-01-01 23:39:23,365 [INFO] [TRANSFORMER]: \u26a1 Quick mode enabled: TFT epochs=1, RL steps=1000
+2026-01-01 23:39:23,365 [INFO] [TRANSFORMER]: \U0001f680 Starting Hybrid Training Pipeline
+2026-01-01 23:39:23,365 [INFO] [TRANSFORMER]: \u2699\ufe0f  Configuration: TFT epochs=1, RL steps=1000
+2026-01-01 23:39:23,365 [INFO] [TRANSFORMER]: \U0001f4c2 Working directory: C:\deltaBot\Bot\detla-bot
+2026-01-01 23:39:23,365 [INFO] [TRANSFORMER]: \U0001f4e5 Step 1: Loading data...
+2026-01-01 23:39:23,366 [INFO] [TRANSFORMER]: \U0001f4c2 Found data file: fused_data_real_FULL.csv (size: 229.00 MB)
+2026-01-01 23:39:23,366 [INFO] [TRANSFORMER]: \U0001f4ca Loading data from: fused_data_real_FULL.csv
+2026-01-01 23:39:26,142 [INFO] [TRANSFORMER]: \u2705 Loaded with optimized dtypes for memory efficiency
+2026-01-01 23:39:26,398 [INFO] [TRANSFORMER]: \U0001f4c8 Data range: 2024-02-08 23:55:00 to 2026-01-01 00:00:00
+2026-01-01 23:39:26,401 [INFO] [TRANSFORMER]: \U0001f4ca Total duration: 692 days
+2026-01-01 23:39:29,659 [INFO] [TRANSFORMER]: \u2139\ufe0f  Generated 'time_idx' for TFT model
+2026-01-01 23:39:29,689 [WARNING] [TRANSFORMER]: \u26a0\ufe0f  Data still contains 26 NaN values. Force filling numeric cols with 0.
+2026-01-01 23:39:29,960 [INFO] [TRANSFORMER]: \U0001f4ca Preprocessing complete: 31 \u2192 32 columns
+2026-01-01 23:39:29,964 [INFO] [TRANSFORMER]: \u2705 Loaded 557,966 rows with 32 columns
+2026-01-01 23:39:29,967 [INFO] [TRANSFORMER]: \U0001f4cb Memory usage: 124.52 MB
+2026-01-01 23:39:29,967 [INFO] [TRANSFORMER]: === Phase 2.1: Training The Predictor (TFT) ===
+2026-01-01 23:39:29,967 [INFO] [TRANSFORMER]: \U0001f4ca Preparing data for TFT...
+2026-01-01 23:39:30,059 [INFO] [TRANSFORMER]: \U0001f4e6 Training dataset size: 557,899 samples
+2026-01-01 23:39:30,059 [INFO] [TRANSFORMER]: \U0001f3d7\ufe0f Building TFT model...
+2026-01-01 23:39:31,525 [INFO] [TRANSFORMER]: \U0001f680 Training TFT for 1 epochs...
+2026-01-01 23:39:31,565 [ERROR] [TRANSFORMER]: \u274c TFT training failed: mat1 and mat2 shapes cannot be multiplied (3840x128 and 1x128)
+2026-01-01 23:39:31,568 [ERROR] [TRANSFORMER]: Traceback (most recent call last):
+  File "c:\deltaBot\Bot\detla-bot\train_hybrid.py", line 305, in train_layer_1_tft
+    predictor.train(max_epochs=epochs)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "c:\deltaBot\Bot\detla-bot\tft_model.py", line 160, in train
+    output = self.model(x)
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\deltaBot\Bot\detla-bot\tft_model.py", line 98, in forward
+    x_emb, weights = self.vsn(x)
+                     ~~~~~~~~^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\deltaBot\Bot\detla-bot\tft_model.py", line 59, in forward
+    var_outputs.append(self.single_variable_grns[i](feat))
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\deltaBot\Bot\detla-bot\tft_model.py", line 33, in forward
+    gate = torch.sigmoid(self.gate(residual))
+                         ~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\torch\nn\modules\linear.py", line 134, in forward
+    return F.linear(input, self.weight, self.bias)
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (3840x128 and 1x128)
+
+2026-01-01 23:39:31,573 [WARNING] [TRANSFORMER]: \u26a0\ufe0f  TFT training failed, but continuing with RL training...
+2026-01-01 23:39:31,573 [WARNING] [TRANSFORMER]: \u26a0\ufe0f  No TFT model available, training RL with raw features only
+2026-01-01 23:39:31,657 [ERROR] [TRANSFORMER]: \u274c Fatal error in main: 'Series' object has no attribute 'select_dtypes'
+2026-01-01 23:39:31,663 [ERROR] [TRANSFORMER]: Traceback (most recent call last):
+  File "c:\deltaBot\Bot\detla-bot\train_hybrid.py", line 613, in <module>
+    main()
+    ~~~~^^
+  File "c:\deltaBot\Bot\detla-bot\train_hybrid.py", line 582, in main
+    agent = RLAgent(df_rl, model_path="model_institutional/ppo_agent_v1")
+  File "c:\deltaBot\Bot\detla-bot\rl_agent.py", line 153, in __init__
+    self.env = CryptoTradingEnv(data, continuous=True)
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\deltaBot\Bot\detla-bot\trading_env.py", line 21, in __init__
+    self.reset()
+    ~~~~~~~~~~^^
+  File "c:\deltaBot\Bot\detla-bot\trading_env.py", line 39, in reset
+    state_vals = self.df.iloc[self.current_step].select_dtypes(include=[np.number]).values
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mdfai\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\generic.py", line 6321, in __getattr__
+    return object.__getattribute__(self, name)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AttributeError: 'Series' object has no attribute 'select_dtypes'. Did you mean: 'convert_dtypes'?
+

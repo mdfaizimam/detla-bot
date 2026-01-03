@@ -1,122 +1,141 @@
 # --- detla-bot/inspect_model.py ---
-# 🕵️ MODEL INSPECTOR
-# Diagnoses WHY the bot is winning or losing.
-# Checks: Trade Frequency, Win Rate, and Prediction Quality.
+# 🕵️ INSTITUTIONAL MODEL INSPECTOR
+# Diagnoses the Brain (PPO) and Eyes (TFT) of the World Class Bot.
 
-import torch
+import logging
 import pandas as pd
 import numpy as np
-import logging
-from train_hybrid import load_data, train_layer_1_tft
-from rl_agent import RLAgent
-from trading_env import CryptoTradingEnv
+import torch
+import os
+import sys
+from pathlib import Path
 
+# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("inspector")
 
+# Import system components
+try:
+    from train_hybrid import DataLoader, TFTPredictor, add_rl_features
+    from rl_agent import RLAgent
+    from trading_env import CryptoTradingEnv
+except ImportError:
+    log.error("❌ Could not import bot modules. Run this from the 'detla-bot' folder.")
+    sys.exit(1)
+
 def inspect():
-    log.info("🔍 STARTING MODEL DIAGNOSIS...")
+    print("\n" + "="*50)
+    print("🔍 STARTING WORLD CLASS MODEL DIAGNOSIS")
+    print("="*50)
 
     # 1. Load Data
-    df = load_data("fused_data_real_FULL.csv")
+    df = DataLoader.load_data()
     if df is None: return
 
-    # 2. Load the Trained "Eyes" (TFT)
-    log.info("👁️ Loading TFT Model...")
-    # We rebuild the predictor structure (weights will be loaded if we trained, 
-    # but here we mainly need the Forecast logic or we assume the PPO saves its state)
-    # Actually, PPO training in train_hybrid.py saved the PPO model separately.
-    
-    # NOTE: To properly test, we need the forecast column. 
-    # Since loading the full TFT model to inference can be complex, 
-    # let's look at the PPO agent's performance on the data directly.
-    
-    # For this diagnostic, we will simulate the environment loop manually
-    # to count trades.
-    
-    # Add a dummy forecast if we don't want to wait for TFT inference
-    # (In a real diagnostic, we'd load the TFT pth, but let's check PPO behavior first)
-    df['feature_forecast'] = df['close'].pct_change().shift(-1).fillna(0) # Perfect foresight proxy for test
-    # Or just zeros to see if PPO is random
-    # df['feature_forecast'] = 0.0 
+    # Preprocess
+    log.info("🧹 Preprocessing data...")
+    df, _ = DataLoader._preprocess_data(df)
 
-    # 3. Setup Environment
-    env = CryptoTradingEnv(df)
+    # 2. Load the "Eyes" (TFT)
+    log.info("👁️  Loading TFT Model & Generating Alpha...")
+    tft_path = "model_institutional/best_sharpe_model.pth"
     
-    # 4. Load the Trained "Brain" (PPO)
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    
-    agent = RLAgent(df, model_path="model_institutional/ppo_agent_v1")
-    
-    # Try to load weights if they exist (RLAgent wrapper usually handles this internally if implemented,
-    # but standard PPO implementations save to a file).
-    # Assuming RLAgent automatically loads from 'model_institutional/ppo_agent_v1' if it exists.
+    if os.path.exists(tft_path):
+        try:
+            tft_model = TFTPredictor()
+            tft_model.load(tft_path)
+            
+            # Enrich data
+            df_rl = add_rl_features(df, tft_model)
+            
+            # 🕵️ DEEP CHECK: Are the eyes working?
+            preds = df_rl["feature_forecast"]
+            pred_std = preds.std()
+            pred_mean = preds.mean()
+            log.info(f"📊 Forecast Stats -> Mean: {pred_mean:.6f}, Std: {pred_std:.6f}")
+            
+            if pred_std < 1e-5:
+                print("\n⚠️  CRITICAL WARNING: MODEL COLLAPSE DETECTED ⚠️")
+                print("   The TFT model is predicting a flat line (Std ~ 0).")
+                print("   The 'Eyes' are blind. The Agent will fail.")
+                print("   FIX: The target (log_ret) is too small. Multiply target by 100 or 1000 during training.")
+                print("-" * 50)
 
-    # 5. Run Detailed Simulation
-    log.info("🚀 Running Simulation (This is fast)...")
-    state, _ = env.reset()
+        except Exception as e:
+            log.error(f"❌ Failed to load TFT model: {e}")
+            return
+    else:
+        log.warning("⚠️  TFT Model not found at " + tft_path)
+        return
+
+    # 3. Load the "Brain" (PPO)
+    log.info("🧠 Loading PPO Agent...")
+    model_path = "model_institutional/ppo_agent_v1"
+    
+    try:
+        agent = RLAgent(df_rl, model_path=model_path)
+    except Exception as e:
+        log.error(f"❌ Failed to load RL Agent: {e}")
+        return
+
+    # 4. Simulation
+    log.info("🚀 Running Backtest Simulation...")
+    
+    env = agent.env
+    state = env.reset()
+    if isinstance(state, tuple): state = state[0]
+    
     done = False
-    
-    trades = 0
-    buys = 0
-    sells = 0
-    holds = 0
     total_reward = 0
-    balance_history = [env.initial_balance]
+    positions = [] 
+    rewards = []
+    
+    # Speed up: Run last 20% only if data is huge
+    if len(df_rl) > 50000:
+        start_idx = int(len(df_rl) * 0.8)
+        log.info(f"⏩ Skipping to validation set (Row {start_idx:,})...")
+        env.current_step = start_idx
     
     while not done:
         action, _ = agent.agent.select_action(state)
-        state, reward, done, _, _ = env.step(action)
+        step_result = env.step(action)
         
+        if len(step_result) == 5:
+            next_state, reward, done, _, _ = step_result
+        else:
+            next_state, reward, done, _ = step_result
+            
+        state = next_state
         total_reward += reward
-        balance_history.append(env.balance)
-        
-        if action == 1: buys += 1
-        elif action == 2: sells += 1
-        else: holds += 1
-        
-        if action != 0: trades += 1
+        positions.append(action)
+        rewards.append(reward)
 
-    # 6. Analysis
-    initial = env.initial_balance
-    final = env.balance
-    pnl_pct = ((final - initial) / initial) * 100
+    # 5. Report
+    positions = np.array(positions)
+    avg_conviction = np.mean(np.abs(positions))
+    pct_long = np.sum(positions > 0.25) / len(positions) * 100
+    pct_short = np.sum(positions < -0.25) / len(positions) * 100
     
-    print("\n" + "="*40)
-    print(f"📊 DIAGNOSTIC REPORT")
-    print("="*40)
-    print(f"💰 Initial Balance: ${initial:,.2f}")
-    print(f"💰 Final Balance:   ${final:,.2f}")
-    print(f"📉 Total PnL:       {pnl_pct:.2f}%")
-    print("-" * 40)
-    print(f"🤖 Total Steps:     {len(df)}")
-    print(f"🔄 Total Trades:    {trades}")
-    print(f"   🟢 Buys:         {buys}")
-    print(f"   🔴 Sells:        {sells}")
-    print(f"   ⚪ Holds:        {holds}")
-    print("-" * 40)
-    
-    if trades > 0:
-        avg_trade = (final - initial) / trades
-        print(f"💵 Avg PnL per Trade: ${avg_trade:.2f}")
-    
-    # Diagnosis Logic
-    print("="*40)
-    print("🩺 DIAGNOSIS:")
-    
-    if trades == 0:
-        print("❌ BROKEN: The bot didn't trade at all. Check inputs/thresholds.")
-    elif trades > len(df) * 0.5:
-        print("⚠️ HYPERACTIVE: The bot is trading on >50% of candles.")
-        print("   -> It is losing money to fees.")
-        print("   -> Solution: Increase 'fee' penalty in training or use longer timeframe.")
-    elif final < initial:
-        print("🔻 LOSING STRATEGY: The bot is actively picking bad trades.")
-        print("   -> The TFT prediction might be noisy.")
-        print("   -> The PPO 'Brain' might need more penalties for losing.")
+    print("\n" + "="*50)
+    print(f"📊 DIAGNOSTIC RESULTS")
+    print("="*50)
+    print(f"💰 Total Accum Reward:  {total_reward:,.2f}")
+    print(f"🌊 Avg Reward/Step:     {np.mean(rewards):.4f}")
+    print("-" * 50)
+    print(f"🧠 AGENT PSYCHOLOGY")
+    print(f"   Avg Conviction:      {avg_conviction:.3f}")
+    print(f"   🟢 Aggressive Longs: {pct_long:.1f}%")
+    print(f"   🔴 Aggressive Shorts: {pct_short:.1f}%")
+    print("-" * 50)
+
+    if pred_std < 1e-5:
+        print("🩺 DIAGNOSIS: BLIND AGENT")
+        print("   The PPO is struggling because the TFT inputs are flat.")
+        print("   ACTION: Retrain TFT with scaled targets.")
+    elif total_reward > 0:
+        print("🩺 DIAGNOSIS: HEALTHY ✅")
     else:
-        print("✅ HEALTHY: The bot is making money!")
+        print("🩺 DIAGNOSIS: UNDERPERFORMING 🔻")
 
 if __name__ == "__main__":
     inspect()

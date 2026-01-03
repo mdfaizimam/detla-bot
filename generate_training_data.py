@@ -1,7 +1,7 @@
 # --- detla-bot/generate_training_data.py ---
-# 🧠 INSTITUTIONAL DATA FUSER (MULTI-TIMEFRAME EDITION)
-# Merges Candles, Spot, Funding, and Macro.
-# Generates 1H and 4H context features from 5m data.
+# 🧠 INSTITUTIONAL DATA FUSER (MULTI-TIMEFRAME + ORDER FLOW EDITION)
+# Merges Candles, Spot, Funding, Macro, and Order Flow (CVD).
+# Generates 1H/4H context and CVD Alpha features.
 
 import pandas as pd
 import numpy as np
@@ -66,6 +66,11 @@ def calculate_mtf_features(df_5m, interval, suffix):
     # Reset index for merging
     df_resampled = df_resampled.reset_index()
     
+    # ✅ FIX LEAKAGE: Shift timestamp to RIGHT edge (Availability Time)
+    # Default resample label is LEFT edge (start of candle), but data is only known at RIGHT edge.
+    # E.g. 10:00 candle (10:00-11:00) is known at 11:00.
+    df_resampled['timestamp'] = df_resampled['timestamp'] + pd.Timedelta(interval)
+    
     # Keep only the timestamp and the new features
     return df_resampled[['timestamp', f'trend_bias_{suffix}', f'volatility_{suffix}', f'rsi_{suffix}']]
 
@@ -80,7 +85,7 @@ def process_symbol_group(base_asset, candles, spot, funding, macro):
     if c_df.empty: return pd.DataFrame()
     c_df = c_df.sort_values('timestamp')
 
-    # 2. Filter Spot Candles (For Basis)
+    # 2. Filter Spot Candles (For Basis & Order Flow)
     s_df = spot[spot['base_asset'] == base_asset].copy()
     s_df = s_df.sort_values('timestamp')
     
@@ -101,8 +106,9 @@ def process_symbol_group(base_asset, candles, spot, funding, macro):
     # 🔗 FUSION (Smart Merge)
     # ---------------------------------------------------------
     
-    # Merge Spot (Nearest match within 5m)
-    df = pd.merge_asof(c_df, s_df[['timestamp', 'spot_close', 'spot_volume']],
+    # Merge Spot (Nearest match within 5m) - ✅ UPDATED to include taker_buy_vol
+    # We grab 'taker_buy_vol' here so we can calculate CVD later
+    df = pd.merge_asof(c_df, s_df[['timestamp', 'spot_close', 'spot_volume', 'taker_buy_vol']],
                        on='timestamp', direction='nearest', tolerance=pd.Timedelta("5m"))
     
     # Merge Funding (Backward: Last known funding rate)
@@ -137,8 +143,31 @@ def process_symbol_group(base_asset, candles, spot, funding, macro):
     roll_std = df['volume'].rolling(288).std().replace(0, 1)
     df['vol_zscore'] = (df['volume'] - roll_mean) / roll_std
     
-    # E. Order Book Imbalance Proxy
+    # E. Order Book Imbalance Proxy (Legacy Proxy using Basis)
     df['obi'] = np.sign(df['basis']) * np.log1p(df['volume']) / 10.0
+    
+    # ---------------------------------------------------------
+    # 🌊 ORDER FLOW (CVD) FEATURES - The "Alpha" Upgrade
+    # ---------------------------------------------------------
+    
+    # 1. Calculate Raw Volume Delta (Buy Pressure - Sell Pressure)
+    # Taker Sell = Total Vol - Taker Buy
+    # Delta = Taker Buy - Taker Sell => 2*Taker Buy - Total
+    # Note: We use Spot Volume for CVD as it represents "Real" demand
+    vol_delta = (2 * df['taker_buy_vol']) - df['spot_volume']
+    
+    # 2. CVD Momentum (Velocity)
+    # Is buying pressure accelerating?
+    # Normalize by total volume to make it comparable across time
+    df['cvd_velocity'] = vol_delta.rolling(12).mean() / df['spot_volume'].rolling(288).mean().replace(0, 1)
+    
+    # 3. CVD Divergence / Z-Score
+    # Are we seeing unusual buying pressure relative to recent history?
+    roll_delta_mean = vol_delta.rolling(288).mean()
+    roll_delta_std = vol_delta.rolling(288).std().replace(0, 1)
+    df['cvd_zscore'] = (vol_delta - roll_delta_mean) / roll_delta_std
+
+    # ---------------------------------------------------------
     
     # F. Liquidity Levels
     window_7d = 2016 
@@ -164,14 +193,14 @@ def process_symbol_group(base_asset, candles, spot, funding, macro):
     # Sanitize Infinite values
     df = df.replace([np.inf, -np.inf], 0)
     
-    log.info(f"   ✅ {base_asset}: Generated {len(df)} MTF-aligned rows.")
+    log.info(f"   ✅ {base_asset}: Generated {len(df)} MTF & CVD-aligned rows.")
     return df
 
 # --------------------------------------------------------------------------------
 # 3. MAIN RUNNER
 # --------------------------------------------------------------------------------
 def generate_real_data():
-    log.info("🚀 Starting Institutional Data Fusion (MTF Edition)...")
+    log.info("🚀 Starting Institutional Data Fusion (MTF + CVD Edition)...")
     
     # Load Source Files
     candles = load_csv("historical_candles.csv")
@@ -205,7 +234,7 @@ def generate_real_data():
     log.info(f"   Features: {list(final_df.columns)}")
     
     final_df.to_csv(OUTPUT_FILE, index=False)
-    log.info(f"✅ SUCCESS! MTF Training data saved to: {Path(OUTPUT_FILE).resolve()}")
+    log.info(f"✅ SUCCESS! Training data saved to: {Path(OUTPUT_FILE).resolve()}")
 
 if __name__ == "__main__":
     generate_real_data()

@@ -843,6 +843,8 @@ class FeatureEngine:
             await self._publish(payload)
             
     async def _process_message(self, raw: dict):
+        start_time = time.perf_counter() # ⏱️ Start Timer
+
         if raw.get("type") == "synthetic_heartbeat":
             return
 
@@ -886,6 +888,12 @@ class FeatureEngine:
         
         except Exception as e:
             log.error(f"Error processing message type {msg_type} for {symbol}: {e}")
+        
+        finally:
+            # ⏱️ Latency Check
+            duration = (time.perf_counter() - start_time) * 1000 # ms
+            if duration > 100:
+                log.warning(f"⚠️ High Latency: {duration:.2f}ms for {msg_type} on {symbol}")
 
     async def _message_listener(self):
         while not self._stop_flag:
