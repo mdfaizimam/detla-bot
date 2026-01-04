@@ -419,6 +419,144 @@ class HistoricalDataFetcher:
             await self.close()
             print("\n✅ INSTITUTIONAL FETCH COMPLETE.")
 
+    # ------------------------------------------------------------------
+    # 7. Live Trading Methods (Synchronous)
+    # ------------------------------------------------------------------
+    def fetch_binance_candles_sync(self, symbol="BTCUSDT", interval="5m", limit=1000):
+        """
+        Synchronous fetch for live bot.
+        """
+        import requests
+        try:
+            url = f"{BINANCE_SPOT_URL}/api/v3/klines"
+            params = {"symbol": symbol, "interval": interval, "limit": limit}
+            resp = requests.get(url, params=params, timeout=10)
+            data = resp.json()
+            
+            if not isinstance(data, list):
+                log.error(f"Binance fetch failed: {data}")
+                return pd.DataFrame()
+                
+            cols = [
+                "timestamp", "open", "high", "low", "close", "volume",
+                "close_time", "quote_av", "trades", "taker_buy_base", "taker_buy_quote", "ignore"
+            ]
+            df = pd.DataFrame(data, columns=cols)
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            for c in ["open", "high", "low", "close", "volume", "taker_buy_base"]:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            
+            # Select and rename for continuity
+            df = df[["timestamp", "open", "high", "low", "close", "volume", "taker_buy_base"]]
+            df = df.rename(columns={"taker_buy_base": "taker_buy_vol"})
+            return df
+        except Exception as e:
+            log.error(f"Live Binance Fetch Error: {e}")
+            return pd.DataFrame()
+
+    def fetch_delta_candles_sync(self, symbol="BTCUSD", interval="5m", limit=1000):
+        """
+        Synchronous fetch for live bot (Delta).
+        """
+        import requests
+        try:
+            # Helper to map standard intervals to Delta
+            # Delta Res: 1m, 5m, 15m, 1h, 4h, 1d
+            url = f"{DELTA_BASE_URL}/v2/history/candles"
+            
+            # Calculate start/end
+            # limit * interval_seconds
+            # Approximating start time usually fine for 'limit' based APIS, 
+            # but Delta requires start/end/limit.
+            
+            end_ts = int(time.time())
+            # interval map
+            mins = 5
+            if interval == "1m": mins = 1
+            elif interval == "1h": mins = 60
+            elif interval == "4h": mins = 240
+            
+            start_ts = end_ts - (limit * mins * 60)
+            
+            params = {
+                "symbol": symbol,
+                "resolution": interval,
+                "start": start_ts,
+                "end": end_ts,
+                "limit": limit
+            }
+            
+            resp = requests.get(url, params=params, timeout=10)
+            data = resp.json()
+            
+            if not data.get("success"):
+                log.error(f"Delta fetch failed: {data}")
+                return pd.DataFrame()
+                
+            result = data.get("result", [])
+            if not result: return pd.DataFrame()
+            
+            df = pd.DataFrame(result)
+            # Delta returns: time (unix), open, high, low, close, volume
+            df["timestamp"] = pd.to_datetime(df["time"], unit="s")
+            df = df.drop(columns=["time"])
+            
+            for c in ["open", "high", "low", "close", "volume"]:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+                
+            return df.sort_values("timestamp")
+            
+        except Exception as e:
+            log.error(f"Live Delta Fetch Error: {e}")
+            return pd.DataFrame()
+
+    def get_current_funding_rate_sync(self, symbol="BTCUSD"):
+        import requests
+        try:
+             # Ticker often has funding info or 'mark_price' endpoint
+             url = f"{DELTA_BASE_URL}/v2/products/{symbol}"
+             resp = requests.get(url, timeout=5)
+             data = resp.json()
+             if data.get("success"):
+                 # Product details might have funding properties or use /v2/tickers
+                 # Let's check Ticker
+                 pass
+             
+             # Better: /v2/tickers/{symbol}
+             url2 = f"{DELTA_BASE_URL}/v2/tickers/{symbol}"
+             resp2 = requests.get(url2, timeout=5)
+             data2 = resp2.json()
+             if data2.get("success"):
+                 # Ticker usually contains 'mark_price', 'funding_rate'??
+                 # Delta documentation: Ticker has 'mark_price'. 
+                 # Funding rate is often in "contract_type": "perpetual_futures" metadata or separate endpoint.
+                 # Let's estimate or return 0 if not found easily.
+                 # Wait, fetcher uses /v2/history/candles for funding history.
+                 # For live, maybe just use 0 or last known.
+                 # Actually, let's use the most recent candle from FUNDING:symbol
+                 
+                 funding_sym = f"FUNDING:{symbol}"
+                 end_ts = int(time.time())
+                 start_ts = end_ts - 3600*8
+                 
+                 params = {
+                     "symbol": funding_sym,
+                     "resolution": "1h",
+                     "start": start_ts,
+                     "end": end_ts,
+                     "limit": 5
+                 }
+                 url_hist = f"{DELTA_BASE_URL}/v2/history/candles"
+                 resp_h = requests.get(url_hist, params=params)
+                 data_h = resp_h.json()
+                 if data_h.get("result"):
+                     # Last close is current funding rate
+                     return float(data_h["result"][-1]["close"])
+                     
+             return 0.0
+        except Exception:
+            return 0.0
+
 if __name__ == "__main__":
     if sys.platform == 'win32':
         import warnings

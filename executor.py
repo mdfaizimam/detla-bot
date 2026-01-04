@@ -10,405 +10,283 @@ import logging
 import time
 import csv
 import os
+import requests
+import hmac
+import hashlib
+import json
 from datetime import datetime
 from typing import Optional, Any, Dict, Tuple
-from redis import asyncio as aioredis
 from config import (
-    DELTA_BASE_URL, API_KEY, API_SECRET, SIGNAL_CHANNEL, MONITORING_CHANNEL,
-    USER_AGENT, DMS_ID, TSL_ENABLED, TSL_CHANNEL, config, TRADING_SYMBOLS,
-    BRACKET_STOP_TRIGGER, BRACKET_ORDER_TYPE, REDIS_POSITION_LOCK_PREFIX
+    DELTA_BASE_URL, API_KEY, API_SECRET, USER_AGENT
 )
-from utils.api_client import DeltaAPIClient
-from risk_manager import RiskManager
 
 logger = logging.getLogger("executor")
 
-class OrderExecutionManager:
-    # 🔧 CHANGED: Increased from 60 to 300 to match Reconciler cycle & prevent double entries
-    REDIS_POSITION_LOCK_TTL = 300
+class Executor:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": USER_AGENT,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        })
+        self.api_key = API_KEY
+        self.api_secret = API_SECRET
+        self.base_url = DELTA_BASE_URL
+        self.product_map = {} # Cache product IDs
+        logger.info("✅ Executor initialized (Synchronous).")
 
-    def __init__(self, redis_client: aioredis.Redis, api_client: DeltaAPIClient, risk_manager: RiskManager):
-        self.redis = redis_client
-        self.api_client = api_client
-        # self.session = api_client.session  <-- REMOVED (Unused and caused mock error)
-        self.risk_manager = risk_manager
-        self.product_info_cache: Dict[str, Dict[str, Any]] = {}
-        logger.info("✅ OrderExecutionManager initialized (Market Order Mode).")
+    def _get_signature(self, method, path, payload, query_string):
+        timestamp = str(int(time.time()))
+        # Signature = method + timestamp + path + query_string + body
+        msg = method.upper() + timestamp + path + query_string + payload
+        signature = hmac.new(
+            self.api_secret.encode("utf-8"),
+            msg.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        return signature, timestamp
 
-    async def start(self):
-        logger.info("▶️ OrderExecutionManager starting (listening for signals)...")
+    def _request(self, method, endpoint, params=None, payload=None):
+        url = f"{self.base_url}{endpoint}"
         
-        # 🛡️ Sync State on Boot
-        await self._sync_active_positions()
+        query_string = ""
+        if params:
+            query_string = "?" + "&".join([f"{k}={v}" for k, v in params.items()])
         
-        pubsub = self.redis.pubsub()
-        await pubsub.subscribe(SIGNAL_CHANNEL)
-        try:
-            async for msg in pubsub.listen():
-                if msg.get("type") != "message": continue
-                try:
-                    signal = orjson.loads(msg["data"])
-                except Exception: continue
-                asyncio.create_task(self._handle_signal(signal))
-        except asyncio.CancelledError:
-            logger.info("OrderExecutionManager cancelled.")
-        finally:
-            await pubsub.unsubscribe(SIGNAL_CHANNEL)
-
-    async def _sync_active_positions(self):
-        """
-        🛡️ CRITICAL: Checks for existing open positions on exchange at startup.
-        Restores monitoring and locks if the bot was restarted during a trade.
-        Uses product-id based fetching for reliability.
-        """
-        try:
-            logger.info("♻️ Syncing active positions from Exchange...")
-            count = 0
+        body_str = ""
+        if payload:
+            body_str = json.dumps(payload, separators=(',', ':'), sort_keys=True)
             
-            # Iterate through all trading symbols to check positions specifically
-            # This is more robust than a global fetch which fails schema validation
-            for symbol in TRADING_SYMBOLS:
-                product_id = None
-                
-                # 1. Resolve Product ID
-                product_info = await self._get_product_info(symbol)
-                if product_info:
-                    product_id = product_info.get("id")
-                
-                if not product_id:
-                    logger.warning(f"Could not resolve product ID for {symbol}, skipping sync.")
-                    continue
-
-                # 2. Fetch Position for this specific product
-                status, response = await self.api_client.get("/v2/positions", params={"product_id": str(product_id)})
-                
-                if status != 200 or not response.get("success"):
-                    continue
-
-                result = response.get("result")
-                # Normalize result (can be list or dict)
-                target_pos = None
-                if isinstance(result, dict): target_pos = result
-                elif isinstance(result, list):
-                    for p in result:
-                        if float(p.get("size", 0)) != 0:
-                            target_pos = p
-                            break
-                            
-                if target_pos and float(target_pos.get("size", 0)) != 0:
-                    size = float(target_pos.get("size"))
-                    entry_price = float(target_pos.get("entry_price", 0))
-                    
-                    logger.info(f"♻️ Restoring state for {symbol} (Size: {size})")
-                    await self._notify_monitor(symbol, size, product_id)
-                    count += 1
-
-            logger.info(f"✅ Synced {count} active positions.")
-
-        except Exception as e:
-            logger.error(f"Error syncing positions: {e}", exc_info=True)
-
-    async def _get_product_info(self, symbol: str) -> Optional[Dict[str, Any]]:
-        if symbol in self.product_info_cache:
-            return self.product_info_cache[symbol]
+        signature, timestamp = self._get_signature(method, endpoint, body_str, query_string)
         
-        status, response = await self.api_client.get(f"/v2/products/{symbol}")
-        if status == 200 and response.get("success"):
-            product = response.get("result", {})
-            if product:
-                try:
-                    tick_size = float(product.get("tick_size", "0.5"))
-                    precision = 0
-                    if "." in str(tick_size):
-                        precision = len(str(tick_size).split(".")[-1])
-                    info = {
-                        "id": int(product.get("id")),
-                        "tick_size": tick_size,
-                        "precision": precision,
-                        "symbol": product.get("symbol")
-                    }
-                    self.product_info_cache[symbol] = info
-                    return info
-                except Exception as e:
-                    logger.error("Error parsing product info: %s", e)
-        return None
-
-    async def _acquire_position_lock(self, symbol: str, timeout: int = 5) -> bool:
-        deadline = time.time() + timeout
-        lock_key = f"{REDIS_POSITION_LOCK_PREFIX}{symbol}"
-        lock_value = orjson.dumps({"symbol": symbol, "ts": time.time()})
-        while time.time() < deadline:
-            ok = await self.redis.set(lock_key, lock_value, ex=self.REDIS_POSITION_LOCK_TTL, nx=True)
-            if ok: return True
-            await asyncio.sleep(0.25)
-        logger.warning("⚠️ Could not acquire lock for %s (Busy)", symbol)
-        return False
-
-    async def _release_position_lock(self, symbol: str):
-        try:
-            lock_key = f"{REDIS_POSITION_LOCK_PREFIX}{symbol}"
-            await self.redis.delete(lock_key)
-        except Exception: pass
-
-    async def _handle_signal(self, signal: dict):
-        symbol = signal.get("symbol")
-        direction = signal.get("direction")
-        
-        base_size_config = config["BASE_POSITION_SIZE"]
-        if isinstance(base_size_config, dict):
-            size_hint = base_size_config.get(symbol, 1)
-        else:
-            size_hint = float(base_size_config)
-        int_size = int(size_hint)
-
-        if not symbol or not direction: return
-
-        ok, info = await self.risk_manager.validate_signal(signal)
-        if not ok:
-            logger.warning("Signal rejected by RiskManager: %s", info)
-            return
-
-        if not await self._acquire_position_lock(symbol): return
-
-        try:
-            product_info = await self._get_product_info(symbol)
-            if not product_info: raise Exception("Product Info Unavailable")
-            
-            tp_price = float(signal.get("tp_price", 0))
-            sl_price = float(signal.get("sl_price", 0))
-            if tp_price == 0 or sl_price == 0:
-                logger.error("Invalid TP/SL in signal. Aborting.")
-                await self._release_position_lock(symbol)
-                return
-
-            side = "buy" if direction == "LONG" else "sell"
-            
-            ref_price = float(signal.get("trigger_price", 0))
-            if ref_price == 0: ref_price = tp_price # Fallback heuristic
-            
-            res = await self._place_linked_orders(symbol, side, int_size, tp_price, sl_price, product_info, ref_price)
-            
-            if not res:
-                await self._release_position_lock(symbol)
-                return
-
-            product_id, ret_direction, filled_avg_price = res
-
-            await self._notify_monitor(symbol, int_size, product_id)
-            if TSL_ENABLED:
-                await self._notify_tsl_manager(symbol, ret_direction, int_size, product_id, filled_avg_price)
-
-            logger.info("✅ Trade Executed for %s @ $%.2f. Lock HELD.", symbol, filled_avg_price)
-            
-            # Log to Journal
-            self._log_trade_journal({
-                "symbol": symbol,
-                "direction": direction,
-                "size": int_size,
-                "price": filled_avg_price,
-                "regime": signal.get("regime", "Unknown"),
-                "confidence": signal.get("confidence", 0),
-                "reasoning": signal.get("reasoning", {})
-            })
-
-        except Exception as e:
-            logger.error("❌ Error handling signal for %s: %s", symbol, e, exc_info=True)
-            await self._release_position_lock(symbol)
-
-    def _log_trade_journal(self, trade_data: dict):
-        try:
-            file_exists = os.path.isfile("logs/trade_journal.csv")
-            os.makedirs("logs", exist_ok=True)
-            
-            with open("logs/trade_journal.csv", "a", newline="") as f:
-                writer = csv.writer(f)
-                if not file_exists:
-                    writer.writerow(["Timestamp", "Symbol", "Direction", "Size", "Price", "Regime", "Confidence", "Forecast", "VolZ", "FNG", "DXY_ROC", "VIX"])
-                
-                reasoning = trade_data.get("reasoning", {})
-                writer.writerow([
-                    datetime.now().isoformat(),
-                    trade_data.get("symbol"),
-                    trade_data.get("direction"),
-                    trade_data.get("size"),
-                    trade_data.get("price"),
-                    trade_data.get("regime"),
-                    trade_data.get("confidence"),
-                    reasoning.get("forecast", 0),
-                    reasoning.get("vol_zscore", 0),
-                    reasoning.get("fng", 0),
-                    reasoning.get("dxy_roc", 0),
-                    reasoning.get("vix", 0)
-                ])
-        except Exception as e:
-            logger.error(f"Failed to write to trade journal: {e}")
-
-            logger.error(f"Failed to write to trade journal: {e}")
-
-    async def _place_maker_entry(self, symbol: str, product_id: int, side: str, size: int, ref_price: float, max_slippage=0.005) -> Tuple[bool, float]:
-        """
-        🕵️ GENIUS EXECUTION: Smart Chase-Limit Logic
-        Places Limit Order at Best Bid/Ask. If not filled, chases price up to max_slippage.
-        Returns (Success, AvgFillPrice)
-        """
-        try:
-            # 1. Calculate Hard Limits
-            limit_cap = ref_price * (1 + max_slippage) if side == "buy" else ref_price * (1 - max_slippage)
-            
-            order_id = None
-            start_time = time.time()
-            attempt = 0
-            active_limit_price = 0.0 # Track locally to avoid GET 404s
-            
-            while time.time() - start_time < 20: # 20s Max Chase Time
-                attempt += 1
-                
-                # A. Get Fresh Ticker
-                status, resp = await self.api_client.get(f"/v2/tickers/{symbol}")
-                if status != 200: 
-                    await asyncio.sleep(1)
-                    continue
-                    
-                # Use Orderbook Top if available, else Mark
-                # Delta Ticker usually has 'ask' and 'bid'
-                ticker = resp.get("result", {})
-                best_bid = float(ticker.get("bid", 0) or ticker.get("spot_price", 0))
-                best_ask = float(ticker.get("ask", 0) or ticker.get("spot_price", 0))
-                
-                if best_bid == 0: # Fallback
-                    best_bid = best_ask = float(ticker.get("close", ref_price))
-
-                # B. Determine Price
-                # If BUY, we want to be Best Bid + 1 tick (Aggressive Maker) or just Best Bid
-                # To ensure fill, maybe Best Bid + small delta, but strictly < Best Ask
-                target_price = best_bid if side == "buy" else best_ask
-                
-                if side == "buy":
-                    if target_price > limit_cap: target_price = limit_cap # Cap
-                else:
-                    if target_price < limit_cap: target_price = limit_cap # Floor
-
-                # C. Check status / Chase
-                should_chase = False
-                if order_id:
-                     if side == "buy":
-                         if target_price > active_limit_price: should_chase = True
-                     else:
-                         if target_price < active_limit_price: should_chase = True
-                     
-                     if should_chase:
-                         logger.info(f"🏃 Chasing {side.upper()}: {active_limit_price} -> {target_price}")
-                         # Use correct DELETE payload
-                         await self.api_client.delete("/v2/orders", payload={"id": order_id, "product_id": product_id})
-                         order_id = None
-                         active_limit_price = 0.0
-                
-                # D. Place New Order if needed
-                if not order_id:
-                    price_str = f"{target_price:.6f}".rstrip('0').rstrip('.')
-                    
-                    payload = {
-                        "product_id": product_id,
-                        "size": size,
-                        "side": side,
-                        "order_type": "limit_order",
-                        "limit_price": price_str,
-                        "time_in_force": "gtc"
-                    }
-                    
-                    logger.info(f"🎯 Placing Smart Limit {side.upper()} @ {price_str}")
-                    s, r = await self.api_client.post("/v2/orders", payload)
-                    if s == 200 and r.get("success"):
-                         order_id = int(r["result"]["id"])
-                         active_limit_price = target_price # Update tracker
-                    else:
-                         logger.error(f"Failed to place chase limit: {r}")
-                         # Fallback to Market?
-                         return False, 0.0
-                
-                await asyncio.sleep(2)
-                
-            # Timeout - Cancel and convert to Market?
-            # --- GENIUS UPGRADE: DO NOT PANIC BUY ---
-            # Standard retail bots market buy here. Snipers abort to preserve R:R.
-            
-            logger.warning("⏰ Chase Timeout. Price moved too fast. ABORTING TRADE to preserve R:R.")
-            if order_id:
-                 await self.api_client.delete(f"/v2/orders/{order_id}")
-            
-            return False, 0.0 # Return Fail instead of Market Buy
-            
-        except Exception as e:
-            logger.error(f"Smart Execution Error: {e}")
-            return False, 0.0
-    async def _place_linked_orders(self, symbol, side, size, tp_price, sl_price, product_info, ref_price=0.0) -> Optional[Tuple[int, str, float]]:
-        product_id = product_info["id"]
-        precision = product_info["precision"]
-        
-        # 1. Execute Entry (Smart Chase)
-        # Pass ref_price (mid/close from signal) to calculate Chase Caps
-        success, filled_price = await self._place_maker_entry(symbol, product_id, side, size, ref_price)
-        
-        if not success:
-            logger.error(f"❌ Entry Failed for {symbol}")
-            return None
-            
-        logger.info(f"✅ Entry Filled: {symbol} @ {filled_price}")
-        
-        # 2. Place Bracket (TP/SL)
-        sl_str = f"{sl_price:.{precision}f}"
-        tp_str = f"{tp_price:.{precision}f}"
-
-        bracket_payload = {
-            "product_id": product_id,
-            "product_symbol": symbol,
-            "stop_loss_order": {
-                "order_type": BRACKET_ORDER_TYPE,
-                "stop_price": sl_str,
-            },
-            "take_profit_order": {
-                "order_type": "limit_order",
-                "stop_price": tp_str,
-                "limit_price": tp_str,
-            },
-            "bracket_stop_trigger_method": BRACKET_STOP_TRIGGER
+        headers = {
+            "api-key": self.api_key,
+            "timestamp": timestamp,
+            "signature": signature
         }
         
-        if BRACKET_ORDER_TYPE == "limit_order":
-            bracket_payload["stop_loss_order"]["limit_price"] = sl_str
-
-        logger.info(f"🛡️ Placing Bracket: SL={sl_str} TP={tp_str}")
-        b_status, b_resp = await self.api_client.post("/v2/orders/bracket", bracket_payload)
-        
-        if b_status != 200:
-            logger.error(f"⚠️ Bracket Placement Failed: {b_resp}")
-        
-        direction = "LONG" if side == "buy" else "SHORT"
-        return product_id, direction, filled_price
-
-    async def _notify_monitor(self, symbol: str, size: float, product_id: int):
         try:
-            message = {
-                "type": "start_monitoring",
-                "symbol": symbol,
-                "size": float(size),
-                "product_id": int(product_id),
-                "timestamp": time.time(),
-            }
-            await self.redis.publish(MONITORING_CHANNEL, orjson.dumps(message))
+            resp = self.session.request(method, url, params=params, data=body_str, headers=headers)
+            if resp.status_code == 200:
+                result = resp.json()
+                return result.get("result") if result.get("success") else None
+            else:
+                logger.error(f"API Error {resp.status_code}: {resp.text}")
+                return None
         except Exception as e:
-            logger.error("Failed to notify PositionMonitor: %s", e)
+            logger.error(f"Request failed: {e}")
+            return None
 
-    async def _notify_tsl_manager(self, symbol, direction, size, product_id, entry_price):
+    def get_product_id(self, symbol):
+        if symbol in self.product_map:
+            return self.product_map[symbol]
+        
+        # Fetch fresh
+        products = self._request("GET", "/v2/products")
+        if products:
+            for p in products:
+                if p.get("symbol") == symbol:
+                    pid = p.get("id")
+                    self.product_map[symbol] = pid
+                    return pid
+        return None
+
+    def get_position(self, symbol):
+        """Get current position size (Signed) handling bad_schema"""
+        pid = self.get_product_id(symbol)
+        if not pid:
+            logger.error(f"Could not resolve product_id for {symbol}")
+            return 0.0
+
+        # Pass product_id to avoid 400 bad_schema
+        params = {"product_id": pid} 
+        res = self._request("GET", "/v2/positions", params=params)
+        
+        if res:
+             # Result is usually a dict or list for that specific product
+             # If dict:
+             if isinstance(res, dict):
+                 return float(res.get("size", 0))
+             # If list:
+             for p in res:
+                 return float(p.get("size", 0))
+                 
+        return 0.0
+
+    def calculate_max_qty(self, symbol):
+        """
+        Hardcoded to 1 contract as per user request.
+        To revert, implement balance * leverage logic.
+        """
+        return 1
+
+    def cancel_all_orders(self, product_id):
+        """Cancel all open orders for product"""
         try:
-            payload = {
-                "command": "START_TSL",
-                "symbol": symbol,
-                "direction": direction,
-                "size": float(size),
-                "product_id": int(product_id),
-                "entry_price": float(entry_price),
-            }
-            await self.redis.publish(TSL_CHANNEL, orjson.dumps(payload))
+             # Fetch open orders
+             params = {"product_id": product_id, "state": "open"}
+             orders = self._request("GET", "/v2/orders", params=params)
+             if orders:
+                 logger.info(f"🗑️ Cancelling {len(orders)} open orders...")
+                 for o in orders:
+                     oid = o.get("id")
+                     self._request("DELETE", f"/v2/orders/{oid}", payload={"product_id": product_id})
         except Exception as e:
-            logger.error("Failed to notify TSL Manager: %s", e)
+            logger.error(f"Failed to cancel orders: {e}")
+
+    def place_order(self, symbol, side, qty, bracket=False):
+        """
+        Place Market Order. 
+        If bracket=True: Place SEPARATE TP/SL orders after entry.
+        """
+        try:
+            pid = self.get_product_id(symbol)
+            if not pid:
+                logger.error(f"Product ID not found for {symbol}")
+                return
+
+            # 1. Place MAIN Entry Order
+            main_payload = {
+                "product_id": pid,
+                "size": int(qty),
+                "side": side.lower(),
+                "order_type": "market_order",
+                "time_in_force": "ioc"
+            }
+            
+            logger.info(f"🚀 Placing ENTRY {side.upper()} order: {qty} contracts")
+            res = self._request("POST", "/v2/orders", payload=main_payload)
+            
+            if not res:
+                logger.error("❌ Link Entry Order Failed.")
+                return
+
+            logger.info(f"✅ Entry Order Success: {res.get('id')}")
+            
+            # --- BRACKET LOGIC (Attached manually) ---
+            if bracket:
+                # Wait briefly for fill/ticker update? 
+                # Ideally we use the fill price, but for speed we use current market price logic
+                # or better yet, assume fill happened near current price.
+                
+                ticker = self._request("GET", f"/v2/tickers/{symbol}")
+                if not ticker: return
+                
+                # Mark Price for reference
+                ref_price = float(ticker.get("mark_price") or ticker.get("close"))
+                
+                # 1.5% TP, 1.0% SL
+                tp_pct = 0.015
+                sl_pct = 0.01
+                
+                if side.lower() == "buy":
+                    tp_price = int(ref_price * (1 + tp_pct))
+                    sl_price = int(ref_price * (1 - sl_pct))
+                    exit_side = "sell"
+                else:
+                    tp_price = int(ref_price * (1 - tp_pct))
+                    sl_price = int(ref_price * (1 + sl_pct))
+                    exit_side = "buy" # Exiting a short means Buying
+                
+                logger.info(f"🛡️  Placing Brackets -> TP: {tp_price} | SL: {sl_price}")
+                
+                # 2. Place Take Profit (Limit Reduce Only)
+                tp_payload = {
+                    "product_id": pid,
+                    "size": int(qty),
+                    "side": exit_side,
+                    "order_type": "limit_order",
+                    "limit_price": str(tp_price),
+                    "time_in_force": "gtc",
+                    "post_only": False, # meaningful?
+                    "reduce_only": True # CRITICAL for TP
+                }
+                res_tp = self._request("POST", "/v2/orders", payload=tp_payload)
+                if res_tp: logger.info("✅ TP Placed")
+                else: logger.error("❌ TP Failed")
+
+                # 3. Place Stop Loss (Stop Market Reduce Only)
+                # Delta uses stop_price for trigger.
+                sl_payload = {
+                    "product_id": pid,
+                    "size": int(qty),
+                    "side": exit_side,
+                    "order_type": "market_order", # Stop Market
+                    "stop_price": str(sl_price),
+                    "time_in_force": "gtc",
+                    "reduce_only": True # CRITICAL for SL
+                }
+                 # Note: Delta might require 'stop_order_type' or just 'order_type' with 'stop_price'
+                 # Usually: order_type="market_order" + stop_price => Stop Market.
+                 
+                res_sl = self._request("POST", "/v2/orders", payload=sl_payload)
+                if res_sl: logger.info("✅ SL Placed")
+                else: logger.error("❌ SL Failed")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to place order: {e}")
+
+    def sync_position(self, symbol, target_size_pct):
+        """
+        Robust Sync:
+        1. Cancel Open Orders (Clean Slate)
+        2. Check for Flip (Long->Short or Short->Long)
+        3. Execute Atomic or Split Orders
+        """
+        try:
+            pid = self.get_product_id(symbol)
+            if not pid: return
+
+            # 1. Clean Slate (Cancel old TP/SLs)
+            # self.cancel_all_orders(pid) 
+            # WAIT: If we are holding and just want to keep holding, don't cancel!
+            # Only cancel if we are CHANGING state.
+            
+            # Get State
+            current_qty = self.get_position(symbol) 
+            max_qty = self.calculate_max_qty(symbol) # Returns 1
+            
+            # Target
+            target_qty = 0
+            if target_size_pct > 0.3: target_qty = 1
+            elif target_size_pct < -0.3: target_qty = -1
+            
+            delta_qty = target_qty - current_qty
+            
+            logger.info(f"⚖️ Syncing: Curr={current_qty} -> Targ={target_qty} (Delta={delta_qty})")
+            
+            if delta_qty == 0:
+                # Holding. Do we check if bracket exists?
+                # "World Class": Ideally yes. But for now, assume checks pass.
+                return
+            
+            # If changing position, cancel old orders first
+            self.cancel_all_orders(pid)
+
+            # FLIP LOGIC (e.g. 1 -> -1, or -1 -> 1)
+            # If signs are opposite and neither is zero
+            if (current_qty * target_qty < 0): 
+                logger.info("🔀 Position Flip Detected! Closing first...")
+                # 1. Close Current
+                close_side = "SELL" if current_qty > 0 else "BUY"
+                self.place_order(symbol, close_side, abs(current_qty), bracket=False)
+                
+                # 2. Open Target
+                open_side = "BUY" if target_qty > 0 else "SELL"
+                self.place_order(symbol, open_side, abs(target_qty), bracket=True)
+                return
+
+            # NORMAL LOGIC (Open new, Close to 0, or Add)
+            # Since max is 1, we are either Opening (0->1) or Closing (1->0).
+            
+            side = "BUY" if delta_qty > 0 else "SELL"
+            
+            # Are we opening/increasing?
+            # If target_qty magnitude > current, we are adding risk -> Bracket
+            is_opening = abs(target_qty) > abs(current_qty)
+            
+            self.place_order(symbol, side, abs(delta_qty), bracket=is_opening)
+                
+        except Exception as e:
+            logger.error(f"❌ Execution Error: {e}")

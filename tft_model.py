@@ -96,14 +96,36 @@ class CryptoDataset(Dataset):
         self.pred_len = pred_len
         
         exclude = ['timestamp', 'symbol', 'base_asset', 'time_idx', target]
-        self.feature_cols = [c for c in data.columns if c not in exclude and np.issubdtype(data[c].dtype, np.number)]
         
-        self.features = data[self.feature_cols].values.astype(np.float32)
+        # ✅ ROBUST FEATURES: Force conversion to numeric to avoid "object" dtype issues
+        potential_features = [c for c in data.columns if c not in exclude]
+        self.feature_cols = []
+        
+        # Verify valid features
+        clean_data = data.copy()
+        for c in potential_features:
+            try:
+                # Force numeric
+                clean_data[c] = pd.to_numeric(clean_data[c], errors='coerce').fillna(0.0)
+                # Check if it has variance or valid magnitude? (Optional)
+                self.feature_cols.append(c)
+            except Exception:
+                pass
+        
+        if not self.feature_cols:
+            logging.error(f"❌ CryptoDataset found 0 valid features! Input Columns: {data.columns.tolist()}")
+            # Fallback to prevent crash (though model will output Garbage)
+            self.features = np.zeros((len(data), 1), dtype=np.float32)
+        else:
+            self.features = clean_data[self.feature_cols].values.astype(np.float32)
         
         # ✅ FIX: SCALING TARGETS BY 1000x TO PREVENT MODEL COLLAPSE
         # Log returns are tiny (e.g. 0.0005). Neural Nets hate tiny numbers.
         # We multiply by 1000 so the model sees 0.5 instead.
-        self.targets = (data[target].values.astype(np.float32) * 1000.0)
+        if target in data.columns:
+            self.targets = (pd.to_numeric(data[target], errors='coerce').fillna(0.0).values.astype(np.float32) * 1000.0)
+        else:
+             self.targets = np.zeros(len(data), dtype=np.float32)
 
     def __len__(self):
         return len(self.features) - self.seq_len - self.pred_len
